@@ -11,6 +11,7 @@ var ChannelStore = require('../stores/channel_store.jsx');
 var client = require('../utils/client.jsx');
 var AsyncClient = require('../utils/async_client.jsx');
 var ActionTypes = Constants.ActionTypes;
+var utils = require('../utils/utils.jsx');
 
 var PostInfo = require('./post_info.jsx');
 
@@ -67,6 +68,13 @@ module.exports = React.createClass({
         PostStore.updatePendingPost(post);
         this.forceUpdate();
     },
+    shouldComponentUpdate: function(nextProps) {
+        if (!utils.areStatesEqual(nextProps.post, this.props.post)) {
+            return true;
+        }
+
+        return false;
+    },
     getInitialState: function() {
         return { };
     },
@@ -104,9 +112,14 @@ module.exports = React.createClass({
 
         var timestamp = UserStore.getCurrentUser().update_at;
 
+        var sameUserClass = '';
+        if (this.props.sameUser) {
+            sameUserClass = 'same--user';
+        }
+
         return (
             <div>
-                <div id={post.id} className={"post " + this.props.sameUser + " " + rootUser + " " + postType + " " + currentUserCss}>
+                <div id={post.id} className={"post " + sameUserClass + " " + rootUser + " " + postType + " " + currentUserCss}>
                     { !this.props.hideProfilePic ?
                     <div className="post-profile-img__container">
                         <img className="post-profile-img" src={"/api/v1/users/" + post.user_id + "/image?time=" + timestamp} height="36" width="36" />
