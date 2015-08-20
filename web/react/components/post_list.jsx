@@ -93,12 +93,21 @@ export default class PostList extends React.Component {
                 $('.post-list-holder-by-time').css('height', height + 'px');
             }
 
-            //postHolder.scrollTop(postHolder[0].scrollHeight);
-            //postHolder.perfectScrollbar('update');
-        });
+            if (!this.scrolled) {
+                this.scrollToBottom();
+            }
+        }.bind(this));
 
         postHolder.scroll(function scroll() {
-        });
+            var position = postHolder.scrollTop() + postHolder.height() + 14;
+            var bottom = postHolder[0].scrollHeight;
+
+            if (position === bottom) {
+                this.scrolled = false;
+            } else {
+                this.scrolled = true;
+            }
+        }.bind(this));
 
         $('body').on('click.userpopover', function popOver(e) {
             if ($(e.target).attr('data-toggle') !== 'popover' &&
@@ -140,7 +149,8 @@ export default class PostList extends React.Component {
 
         if (this.state.channel.id !== prevState.channel.id) {
             this.scrollToBottom();
-        } else if (order[0] !== oldOrder[0] && userId === posts[order[0]].user_id) {
+        } else if (order[0] !== oldOrder[0] &&
+                    (userId === posts[order[0]].user_id || !this.scrolled)) {
             this.scrollToBottom();
         }
     }
