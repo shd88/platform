@@ -61,12 +61,8 @@ export default class PostList extends React.Component {
     constructor() {
         super();
 
-        this.scrollPosition = 0;
-        this.preventScrollTrigger = false;
         this.gotMorePosts = false;
-        this.oldScrollHeight = 0;
-        this.oldZoom = 0;
-        this.scrolledToNew = false;
+        this.scrolled = false;
 
         this.onChange = this.onChange.bind(this);
         this.onTimeChange = this.onTimeChange.bind(this);
@@ -83,44 +79,25 @@ export default class PostList extends React.Component {
         UserStore.addStatusesChangeListener(this.onTimeChange);
         SocketStore.addChangeListener(this.onSocketChange);
 
-        $('.post-list-holder-by-time').perfectScrollbar();
-
-        this.resize();
-
-        var postHolder = $('.post-list-holder-by-time')[0];
-        this.scrollPosition = $(postHolder).scrollTop() + $(postHolder).innerHeight();
-        this.oldScrollHeight = postHolder.scrollHeight;
-        this.oldZoom = (window.outerWidth - 8) / window.innerWidth;
+        var postHolder = $('.post-list-holder-by-time');
+        postHolder.perfectScrollbar();
 
         $('.modal').on('show.bs.modal', function onShow() {
             $('.modal-body').css('overflow-y', 'auto');
             $('.modal-body').css('max-height', $(window).height() * 0.7);
         });
 
-        var self = this;
         $(window).resize(function resize() {
-            $(postHolder).perfectScrollbar('update');
-
-            // this only kind of works, detecting zoom in browsers is a nightmare
-            var newZoom = (window.outerWidth - 8) / window.innerWidth;
-
-            if (self.scrollPosition >= postHolder.scrollHeight || (self.oldScrollHeight !== postHolder.scrollHeight && self.scrollPosition >= self.oldScrollHeight) || self.oldZoom !== newZoom) {
-                self.resize();
-            }
-
-            self.oldZoom = newZoom;
-
             if ($('#create_post').length > 0) {
                 var height = $(window).height() - $('#create_post').height() - $('#error_bar').outerHeight() - 50;
                 $('.post-list-holder-by-time').css('height', height + 'px');
             }
+
+            //postHolder.scrollTop(postHolder[0].scrollHeight);
+            //postHolder.perfectScrollbar('update');
         });
 
-        $(postHolder).scroll(function scroll() {
-            if (!self.preventScrollTrigger) {
-                self.scrollPosition = $(postHolder).scrollTop() + $(postHolder).innerHeight();
-            }
-            self.preventScrollTrigger = false;
+        postHolder.scroll(function scroll() {
         });
 
         $('body').on('click.userpopover', function popOver(e) {
@@ -153,13 +130,19 @@ export default class PostList extends React.Component {
             }
         });
     }
-    componentDidUpdate() {
-        this.resize();
-        var postHolder = $('.post-list-holder-by-time')[0];
-        this.scrollPosition = $(postHolder).scrollTop() + $(postHolder).innerHeight();
-        this.oldScrollHeight = postHolder.scrollHeight;
+    componentDidUpdate(prevProps, prevState) {
         $('.post-list__content div .post').removeClass('post--last');
         $('.post-list__content div:last-child .post').addClass('post--last');
+        var order = this.state.postList.order;
+        var posts = this.state.postList.posts;
+        var oldOrder = prevState.postList.order;
+        var userId = UserStore.getCurrentId();
+
+        if (this.state.channel.id !== prevState.channel.id) {
+            this.scrollToBottom();
+        } else if (order[0] !== oldOrder[0] && userId === posts[order[0]].user_id) {
+            this.scrollToBottom();
+        }
     }
     componentWillUnmount() {
         PostStore.removeChangeListener(this.onChange);
@@ -170,18 +153,16 @@ export default class PostList extends React.Component {
         $('.modal').off('show.bs.modal');
     }
     resize() {
-        var postHolder = $('.post-list-holder-by-time')[0];
-        this.preventScrollTrigger = true;
-        if (this.gotMorePosts) {
-            this.gotMorePosts = false;
-            $(postHolder).scrollTop($(postHolder).scrollTop() + (postHolder.scrollHeight - this.oldScrollHeight));
-        } else if ($('#new_message')[0] && !this.scrolledToNew) {
-            $(postHolder).scrollTop($(postHolder).scrollTop() + $('#new_message').offset().top - 63);
-            this.scrolledToNew = true;
-        } else {
-            $(postHolder).scrollTop(postHolder.scrollHeight);
+        var postHolder = $('.post-list-holder-by-time');
+        if ($('#new_message')[0] && !this.scrolledToNew) {
+            //$(postHolder).scrollTop($(postHolder).scrollTop() + $('#new_message').offset().top - 63);
         }
-        $(postHolder).perfectScrollbar('update');
+        postHolder.perfectScrollbar('update');
+    }
+    scrollToBottom() {
+        var postHolder = $('.post-list-holder-by-time');
+        postHolder[0].scrollTop = postHolder[0].scrollHeight;
+        postHolder.perfectScrollbar('update');
     }
     onChange() {
         var newState = getStateFromStores();
@@ -194,7 +175,6 @@ export default class PostList extends React.Component {
             }
             if (this.state.channel.id !== newState.channel.id) {
                 PostStore.clearUnseenDeletedPosts(this.state.channel.id);
-                this.scrolledToNew = false;
             }
             this.setState(newState);
         }
@@ -521,8 +501,6 @@ export default class PostList extends React.Component {
 
         $(this.refs.loadmore.getDOMNode()).text('Retrieving more messages...');
 
-        var currentPos = $('.post-list').scrollTop;
-
         Client.getPosts(
             channelId,
             order.length,
@@ -549,7 +527,6 @@ export default class PostList extends React.Component {
                 });
 
                 Client.getProfiles();
-                $('.post-list').scrollTop(currentPos);
             }.bind(this),
             function fail(err) {
                 $(this.refs.loadmore.getDOMNode()).text('Load more messages');
