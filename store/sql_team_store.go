@@ -5,7 +5,6 @@ package store
 
 import (
 	"github.com/mattermost/platform/model"
-	"github.com/mattermost/platform/utils"
 )
 
 type SqlTeamStore struct {
@@ -29,15 +28,6 @@ func NewSqlTeamStore(sqlStore *SqlStore) TeamStore {
 }
 
 func (s SqlTeamStore) UpgradeSchemaIfNeeded() {
-	defaultValue := "0"
-	if utils.Cfg.TeamSettings.AllowValetDefault {
-		defaultValue = "1"
-	}
-	s.CreateColumnIfNotExists("Teams", "AllowValet", "AllowedDomains", "tinyint(1)", defaultValue)
-	if !s.DoesColumnExist("Teams", "DisplayName") {
-		s.RenameColumnIfExists("Teams", "Name", "DisplayName", "varchar(64)")
-		s.RenameColumnIfExists("Teams", "Domain", "Name", "varchar(64)")
-	}
 }
 
 func (s SqlTeamStore) CreateIndexesIfNotExists() {
@@ -193,6 +183,26 @@ func (s SqlTeamStore) GetTeamsForEmail(email string) StoreChannel {
 		var data []*model.Team
 		if _, err := s.GetReplica().Select(&data, "SELECT Teams.* FROM Teams, Users WHERE Teams.Id = Users.TeamId AND Users.Email = :Email", map[string]interface{}{"Email": email}); err != nil {
 			result.Err = model.NewAppError("SqlTeamStore.GetTeamsForEmail", "We encounted a problem when looking up teams", "email="+email+", "+err.Error())
+		}
+
+		result.Data = data
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
+func (s SqlTeamStore) GetForExport() StoreChannel {
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		var data []*model.Team
+		if _, err := s.GetReplica().Select(&data, "SELECT * FROM Teams"); err != nil {
+			result.Err = model.NewAppError("SqlTeamStore.GetForExport", "We could not get all teams", err.Error())
 		}
 
 		result.Data = data

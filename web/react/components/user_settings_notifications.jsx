@@ -1,3 +1,6 @@
+// Copyright (c) 2015 Spinpunch, Inc. All Rights Reserved.
+// See License.txt for license information.
+
 var UserStore = require('../stores/user_store.jsx');
 var SettingItemMin = require('./setting_item_min.jsx');
 var SettingItemMax = require('./setting_item_max.jsx');
@@ -5,6 +8,7 @@ var client = require('../utils/client.jsx');
 var AsyncClient = require('../utils/async_client.jsx');
 var utils = require('../utils/utils.jsx');
 var assign = require('object-assign');
+import {config} from '../utils/config.js';
 
 function getNotificationsStateFromStores() {
     var user = UserStore.getCurrentUser();
@@ -64,7 +68,9 @@ function getNotificationsStateFromStores() {
         }
     }
 
-    return {notifyLevel: desktop, enableEmail: email, soundNeeded: soundNeeded, enableSound: sound, usernameKey: usernameKey, mentionKey: mentionKey, customKeys: customKeys, customKeysChecked: customKeys.length > 0, firstNameKey: firstNameKey, allKey: allKey, channelKey: channelKey};
+    return {notifyLevel: desktop, enableEmail: email, soundNeeded: soundNeeded, enableSound: sound,
+            usernameKey: usernameKey, mentionKey: mentionKey, customKeys: customKeys, customKeysChecked: customKeys.length > 0,
+            firstNameKey: firstNameKey, allKey: allKey, channelKey: channelKey};
 }
 
 export default class NotificationsTab extends React.Component {
@@ -133,7 +139,7 @@ export default class NotificationsTab extends React.Component {
         this.props.updateTab('general');
     }
     updateSection(section) {
-        this.setState(this.getInitialState());
+        this.setState(getNotificationsStateFromStores());
         this.props.updateSection(section);
     }
     componentDidMount() {
@@ -153,15 +159,15 @@ export default class NotificationsTab extends React.Component {
     }
     handleNotifyRadio(notifyLevel) {
         this.setState({notifyLevel: notifyLevel});
-        this.refs.wrapper.getDOMNode().focus();
+        React.findDOMNode(this.refs.wrapper).focus();
     }
     handleEmailRadio(enableEmail) {
         this.setState({enableEmail: enableEmail});
-        this.refs.wrapper.getDOMNode().focus();
+        React.findDOMNode(this.refs.wrapper).focus();
     }
     handleSoundRadio(enableSound) {
         this.setState({enableSound: enableSound});
-        this.refs.wrapper.getDOMNode().focus();
+        React.findDOMNode(this.refs.wrapper).focus();
     }
     updateUsernameKey(val) {
         this.setState({usernameKey: val});
@@ -179,10 +185,10 @@ export default class NotificationsTab extends React.Component {
         this.setState({channelKey: val});
     }
     updateCustomMentionKeys() {
-        var checked = this.refs.customcheck.getDOMNode().checked;
+        var checked = React.findDOMNode(this.refs.customcheck).checked;
 
         if (checked) {
-            var text = this.refs.custommentions.getDOMNode().value;
+            var text = React.findDOMNode(this.refs.custommentions).value;
 
             // remove all spaces and split string into individual keys
             this.setState({customKeys: text.replace(/ /g, ''), customKeysChecked: true});
@@ -191,7 +197,7 @@ export default class NotificationsTab extends React.Component {
         }
     }
     onCustomChange() {
-        this.refs.customcheck.getDOMNode().checked = true;
+        React.findDOMNode(this.refs.customcheck).checked = true;
         this.updateCustomMentionKeys();
     }
     render() {
@@ -199,8 +205,6 @@ export default class NotificationsTab extends React.Component {
         if (this.state.serverError) {
             serverError = this.state.serverError;
         }
-
-        var self = this;
 
         var user = this.props.user;
 
@@ -219,12 +223,12 @@ export default class NotificationsTab extends React.Component {
             let inputs = [];
 
             inputs.push(
-                <div>
+                <div key='userNotificationLevelOption'>
                     <div className='radio'>
                         <label>
                             <input type='radio'
                                 checked={notifyActive[0]}
-                                onChange={self.handleNotifyRadio.bind(this, 'all')}
+                                onChange={this.handleNotifyRadio.bind(this, 'all')}
                             >
                                 For all activity
                             </input>
@@ -236,7 +240,7 @@ export default class NotificationsTab extends React.Component {
                             <input
                                 type='radio'
                                 checked={notifyActive[1]}
-                                onChange={self.handleNotifyRadio.bind(this, 'mention')}
+                                onChange={this.handleNotifyRadio.bind(this, 'mention')}
                             >
                                 Only for mentions and private messages
                             </input>
@@ -248,7 +252,7 @@ export default class NotificationsTab extends React.Component {
                             <input
                                 type='radio'
                                 checked={notifyActive[2]}
-                                onChange={self.handleNotifyRadio.bind(this, 'none')}
+                                onChange={this.handleNotifyRadio.bind(this, 'none')}
                             >
                                 Never
                             </input>
@@ -258,9 +262,9 @@ export default class NotificationsTab extends React.Component {
             );
 
             handleUpdateDesktopSection = function updateDesktopSection(e) {
-                self.props.updateSection('');
+                this.props.updateSection('');
                 e.preventDefault();
-            };
+            }.bind(this);
 
             desktopSection = (
                 <SettingItemMax
@@ -282,8 +286,8 @@ export default class NotificationsTab extends React.Component {
             }
 
             handleUpdateDesktopSection = function updateDesktopSection() {
-                self.props.updateSection('desktop');
-            };
+                this.props.updateSection('desktop');
+            }.bind(this);
 
             desktopSection = (
                 <SettingItemMin
@@ -307,13 +311,13 @@ export default class NotificationsTab extends React.Component {
             let inputs = [];
 
             inputs.push(
-                <div>
+                <div key='userNotificationSoundOptions'>
                     <div className='radio'>
                         <label>
                             <input
                                 type='radio'
                                 checked={soundActive[0]}
-                                onChange={self.handleSoundRadio.bind(this, 'true')}
+                                onChange={this.handleSoundRadio.bind(this, 'true')}
                             >
                                 On
                             </input>
@@ -325,7 +329,7 @@ export default class NotificationsTab extends React.Component {
                             <input
                                 type='radio'
                                 checked={soundActive[1]}
-                                onChange={self.handleSoundRadio.bind(this, 'false')}
+                                onChange={this.handleSoundRadio.bind(this, 'false')}
                             >
                                 Off
                             </input>
@@ -336,9 +340,9 @@ export default class NotificationsTab extends React.Component {
             );
 
             handleUpdateSoundSection = function updateSoundSection(e) {
-                self.props.updateSection('');
+                this.props.updateSection('');
                 e.preventDefault();
-            };
+            }.bind(this);
 
             soundSection = (
                 <SettingItemMax
@@ -360,8 +364,8 @@ export default class NotificationsTab extends React.Component {
             }
 
             handleUpdateSoundSection = function updateSoundSection() {
-                self.props.updateSection('sound');
-            };
+                this.props.updateSection('sound');
+            }.bind(this);
 
             soundSection = (
                 <SettingItemMin
@@ -386,13 +390,13 @@ export default class NotificationsTab extends React.Component {
             let inputs = [];
 
             inputs.push(
-                <div>
+                <div key='userNotificationEmailOptions'>
                     <div className='radio'>
                         <label>
                             <input
                                 type='radio'
                                 checked={emailActive[0]}
-                                onChange={self.handleEmailRadio.bind(this, 'true')}
+                                onChange={this.handleEmailRadio.bind(this, 'true')}
                             >
                                 On
                             </input>
@@ -404,7 +408,7 @@ export default class NotificationsTab extends React.Component {
                             <input
                                 type='radio'
                                 checked={emailActive[1]}
-                                onChange={self.handleEmailRadio.bind(this, 'false')}
+                                onChange={this.handleEmailRadio.bind(this, 'false')}
                             >
                                 Off
                             </input>
@@ -416,9 +420,9 @@ export default class NotificationsTab extends React.Component {
             );
 
             handleUpdateEmailSection = function updateEmailSection(e) {
-                self.props.updateSection('');
+                this.props.updateSection('');
                 e.preventDefault();
-            };
+            }.bind(this);
 
             emailSection = (
                 <SettingItemMax
@@ -438,8 +442,8 @@ export default class NotificationsTab extends React.Component {
             }
 
             handleUpdateEmailSection = function updateEmailSection() {
-                self.props.updateSection('email');
-            };
+                this.props.updateSection('email');
+            }.bind(this);
 
             emailSection = (
                 <SettingItemMin
@@ -463,10 +467,10 @@ export default class NotificationsTab extends React.Component {
 
             if (user.first_name) {
                 handleUpdateFirstNameKey = function handleFirstNameKeyChange(e) {
-                    self.updateFirstNameKey(e.target.checked);
-                };
+                    this.updateFirstNameKey(e.target.checked);
+                }.bind(this);
                 inputs.push(
-                    <div>
+                    <div key='userNotificationFirstNameOption'>
                         <div className='checkbox'>
                             <label>
                                 <input
@@ -483,10 +487,10 @@ export default class NotificationsTab extends React.Component {
             }
 
             handleUpdateUsernameKey = function handleUsernameKeyChange(e) {
-                self.updateUsernameKey(e.target.checked);
-            };
+                this.updateUsernameKey(e.target.checked);
+            }.bind(this);
             inputs.push(
-                <div>
+                <div key='userNotificationUsernameOption'>
                     <div className='checkbox'>
                         <label>
                             <input
@@ -502,10 +506,10 @@ export default class NotificationsTab extends React.Component {
             );
 
             handleUpdateMentionKey = function handleMentionKeyChange(e) {
-                self.updateMentionKey(e.target.checked);
-            };
+                this.updateMentionKey(e.target.checked);
+            }.bind(this);
             inputs.push(
-                <div>
+                <div key='userNotificationMentionOption'>
                     <div className='checkbox'>
                         <label>
                             <input
@@ -521,10 +525,10 @@ export default class NotificationsTab extends React.Component {
             );
 
             handleUpdateAllKey = function handleAllKeyChange(e) {
-                self.updateAllKey(e.target.checked);
-            };
+                this.updateAllKey(e.target.checked);
+            }.bind(this);
             inputs.push(
-                <div>
+                <div key='userNotificationAllOption'>
                     <div className='checkbox'>
                         <label>
                             <input
@@ -540,10 +544,10 @@ export default class NotificationsTab extends React.Component {
             );
 
             handleUpdateChannelKey = function handleChannelKeyChange(e) {
-                self.updateChannelKey(e.target.checked);
-            };
+                this.updateChannelKey(e.target.checked);
+            }.bind(this);
             inputs.push(
-                <div>
+                <div key='userNotificationChannelOption'>
                     <div className='checkbox'>
                         <label>
                             <input
@@ -559,7 +563,7 @@ export default class NotificationsTab extends React.Component {
             );
 
             inputs.push(
-                <div>
+                <div key='userNotificationCustomOption'>
                     <div className='checkbox'>
                         <label>
                             <input
@@ -583,9 +587,9 @@ export default class NotificationsTab extends React.Component {
             );
 
             handleUpdateKeysSection = function updateKeysSection(e) {
-                self.props.updateSection('');
+                this.props.updateSection('');
                 e.preventDefault();
-            };
+            }.bind(this);
             keysSection = (
                 <SettingItemMax
                     title='Words that trigger mentions'
@@ -628,8 +632,8 @@ export default class NotificationsTab extends React.Component {
             }
 
             handleUpdateKeysSection = function updateKeysSection() {
-                self.props.updateSection('keys');
-            };
+                this.props.updateSection('keys');
+            }.bind(this);
 
             keysSection = (
                 <SettingItemMin

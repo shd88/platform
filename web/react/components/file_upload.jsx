@@ -6,71 +6,64 @@ var Constants = require('../utils/constants.jsx');
 var ChannelStore = require('../stores/channel_store.jsx');
 var utils = require('../utils/utils.jsx');
 
-module.exports = React.createClass({
-    displayName: 'FileUpload',
-    propTypes: {
-        onUploadError: React.PropTypes.func,
-        getFileCount: React.PropTypes.func,
-        onFileUpload: React.PropTypes.func,
-        onUploadStart: React.PropTypes.func,
-        channelId: React.PropTypes.string,
-        postType: React.PropTypes.string
-    },
-    getInitialState: function() {
-        return {requests: {}};
-    },
-    handleChange: function() {
-        var element = $(this.refs.fileInput.getDOMNode());
-        var files = element.prop('files');
+export default class FileUpload extends React.Component {
+    constructor(props) {
+        super(props);
+
+        this.uploadFiles = this.uploadFiles.bind(this);
+        this.handleChange = this.handleChange.bind(this);
+        this.handleDrop = this.handleDrop.bind(this);
+
+        this.state = {
+            requests: {}
+        };
+    }
+
+    fileUploadSuccess(channelId, data) {
+        var parsedData = $.parseJSON(data);
+        this.props.onFileUpload(parsedData.filenames, parsedData.client_ids, channelId);
+
+        var requests = this.state.requests;
+        for (var j = 0; j < parsedData.client_ids.length; j++) {
+            delete requests[parsedData.client_ids[j]];
+        }
+        this.setState({requests: requests});
+    }
+
+    fileUploadFail(clientId, err) {
+        this.props.onUploadError(err, clientId);
+    }
+
+    uploadFiles(files) {
+        // clear any existing errors
+        this.props.onUploadError(null);
 
         var channelId = this.props.channelId || ChannelStore.getCurrentId();
 
-        this.props.onUploadError(null);
+        var uploadsRemaining = Constants.MAX_UPLOAD_FILES - this.props.getFileCount(channelId);
+        var numUploads = 0;
 
-        // This looks redundant, but must be done this way due to
-        // setState being an asynchronous call
-        var numFiles = 0;
-        for (var i = 0; i < files.length; i++) {
-            if (files[i].size <= Constants.MAX_FILE_SIZE) {
-                numFiles++;
-            }
-        }
+        // keep track of how many files have been too large
+        var tooLargeFiles = [];
 
-        var numToUpload = Math.min(Constants.MAX_UPLOAD_FILES - this.props.getFileCount(channelId), numFiles);
-
-        if (numFiles > numToUpload) {
-            this.props.onUploadError('Uploads limited to ' + Constants.MAX_UPLOAD_FILES + ' files maximum. Please use additional posts for more files.');
-        }
-
-        for (var i = 0; i < files.length && i < numToUpload; i++) {
+        for (let i = 0; i < files.length && numUploads < uploadsRemaining; i++) {
             if (files[i].size > Constants.MAX_FILE_SIZE) {
-                this.props.onUploadError('Files must be no more than ' + Constants.MAX_FILE_SIZE / 1000000 + ' MB');
+                tooLargeFiles.push(files[i]);
                 continue;
             }
 
-            // generate a unique id that can be used by other components to refer back to this file upload
+            // generate a unique id that can be used by other components to refer back to this upload
             var clientId = utils.generateId();
 
-            // Prepare data to be uploaded.
+            // prepare data to be uploaded
             var formData = new FormData();
             formData.append('channel_id', channelId);
             formData.append('files', files[i], files[i].name);
             formData.append('client_ids', clientId);
 
             var request = client.uploadFile(formData,
-                function(data) {
-                    var parsedData = $.parseJSON(data);
-                    this.props.onFileUpload(parsedData.filenames, parsedData.client_ids, channelId);
-
-                    var requests = this.state.requests;
-                    for (var j = 0; j < parsedData.client_ids.length; j++) {
-                        delete requests[parsedData.client_ids[j]];
-                    }
-                    this.setState({requests: requests});
-                }.bind(this),
-                function(err) {
-                    this.props.onUploadError(err, clientId);
-                }.bind(this)
+                this.fileUploadSuccess.bind(this, channelId),
+                this.fileUploadFail.bind(this, clientId)
             );
 
             var requests = this.state.requests;
@@ -78,7 +71,25 @@ module.exports = React.createClass({
             this.setState({requests: requests});
 
             this.props.onUploadStart([clientId], channelId);
+
+            numUploads += 1;
         }
+
+        if (files.length > uploadsRemaining) {
+            this.props.onUploadError(`Uploads limited to ${Constants.MAX_UPLOAD_FILES} files maximum. Please use additional posts for more files.`);
+        } else if (tooLargeFiles.length > 1) {
+            var tooLargeFilenames = tooLargeFiles.map((file) => file.name).join(', ');
+
+            this.props.onUploadError(`Files above ${Constants.MAX_FILE_SIZE / 1000000}MB could not be uploaded: ${tooLargeFilenames}`);
+        } else if (tooLargeFiles.length > 0) {
+            this.props.onUploadError(`File above ${Constants.MAX_FILE_SIZE / 1000000}MB could not be uploaded: ${tooLargeFiles[0].name}`);
+        }
+    }
+
+    handleChange() {
+        var element = $(React.findDOMNode(this.refs.fileInput));
+
+        this.uploadFiles(element.prop('files'));
 
         // clear file input for all modern browsers
         try {
@@ -87,97 +98,56 @@ module.exports = React.createClass({
                 element[0].type = 'text';
                 element[0].type = 'file';
             }
-        } catch(e) {}
-    },
-    handleDrop: function(e) {
+        } catch(e) {
+            // Do nothing
+        }
+    }
+
+    handleDrop(e) {
         this.props.onUploadError(null);
 
         var files = e.originalEvent.dataTransfer.files;
-        var channelId = this.props.channelId || ChannelStore.getCurrentId();
 
         if (typeof files !== 'string' && files.length) {
-            var numFiles = files.length;
-
-            var numToUpload = Math.min(Constants.MAX_UPLOAD_FILES - this.props.getFileCount(channelId), numFiles);
-
-            if (numFiles > numToUpload) {
-                this.props.onUploadError('Uploads limited to ' + Constants.MAX_UPLOAD_FILES + ' files maximum. Please use additional posts for more files.');
-            }
-
-            for (var i = 0; i < files.length && i < numToUpload; i++) {
-                if (files[i].size > Constants.MAX_FILE_SIZE) {
-                    this.props.onUploadError('Files must be no more than ' + Constants.MAX_FILE_SIZE / 1000000 + ' MB');
-                    continue;
-                }
-
-                // generate a unique id that can be used by other components to refer back to this file upload
-                var clientId = utils.generateId();
-
-                // Prepare data to be uploaded.
-                var formData = new FormData();
-                formData.append('channel_id', channelId);
-                formData.append('files', files[i], files[i].name);
-                formData.append('client_ids', clientId);
-
-                var request = client.uploadFile(formData,
-                    function(data) {
-                        var parsedData = $.parseJSON(data);
-                        this.props.onFileUpload(parsedData.filenames, parsedData.client_ids, channelId);
-
-                        var requests = this.state.requests;
-                        for (var j = 0; j < parsedData.client_ids.length; j++) {
-                            delete requests[parsedData.client_ids[j]];
-                        }
-                        this.setState({requests: requests});
-                    }.bind(this),
-                    function(err) {
-                        this.props.onUploadError(err, clientId);
-                    }.bind(this)
-                );
-
-                var requests = this.state.requests;
-                requests[clientId] = request;
-                this.setState({requests: requests});
-
-                this.props.onUploadStart([clientId], channelId);
-            }
+            this.uploadFiles(files);
         } else {
             this.props.onUploadError('Invalid file upload', -1);
         }
-    },
-    componentDidMount: function() {
-        var inputDiv = this.refs.input.getDOMNode();
+    }
+
+    componentDidMount() {
+        var inputDiv = React.findDOMNode(this.refs.input);
         var self = this;
 
         if (this.props.postType === 'post') {
             $('.row.main').dragster({
-                enter: function() {
+                enter() {
                     $('.center-file-overlay').removeClass('hidden');
                 },
-                leave: function() {
+                leave() {
                     $('.center-file-overlay').addClass('hidden');
                 },
-                drop: function(dragsterEvent, e) {
+                drop(dragsterEvent, e) {
                     $('.center-file-overlay').addClass('hidden');
                     self.handleDrop(e);
                 }
             });
         } else if (this.props.postType === 'comment') {
             $('.post-right__container').dragster({
-                enter: function() {
+                enter() {
                     $('.right-file-overlay').removeClass('hidden');
                 },
-                leave: function() {
+                leave() {
                     $('.right-file-overlay').addClass('hidden');
                 },
-                drop: function(dragsterEvent, e) {
+                drop(dragsterEvent, e) {
                     $('.right-file-overlay').addClass('hidden');
                     self.handleDrop(e);
                 }
             });
         }
 
-        document.addEventListener('paste', function(e) {
+        document.addEventListener('paste', function handlePaste(e) {
             var textarea = $(inputDiv.parentNode.parentNode).find('.custom-textarea')[0];
 
             if (textarea !== e.target && !$.contains(textarea, e.target)) {
@@ -191,7 +161,7 @@ module.exports = React.createClass({
             var items = e.clipboardData.items;
             var numItems = 0;
             if (items) {
-                for (var i = 0; i < items.length; i++) {
+                for (let i = 0; i < items.length; i++) {
                     if (items[i].type.indexOf('image') !== -1) {
                         var testExt = items[i].type.split('/')[1].toLowerCase();
 
@@ -245,19 +215,8 @@ module.exports = React.createClass({
                         formData.append('client_ids', clientId);
 
                         var request = client.uploadFile(formData,
-                            function(data) {
-                                var parsedData = $.parseJSON(data);
-                                self.props.onFileUpload(parsedData.filenames, parsedData.client_ids, channelId);
-
-                                var requests = self.state.requests;
-                                for (var j = 0; j < parsedData.client_ids.length; j++) {
-                                    delete requests[parsedData.client_ids[j]];
-                                }
-                                self.setState({requests: requests});
-                            },
-                            function(err) {
-                                self.props.onUploadError(err, clientId);
-                            }
+                            self.fileUploadSuccess.bind(self, channelId),
+                            self.fileUploadFail.bind(self, clientId)
                         );
 
                         var requests = self.state.requests;
@@ -269,8 +228,9 @@ module.exports = React.createClass({
                 }
             }
         });
-    },
-    cancelUpload: function(clientId) {
+    }
+
+    cancelUpload(clientId) {
         var requests = this.state.requests;
         var request = requests[clientId];
 
@@ -280,15 +240,33 @@ module.exports = React.createClass({
             delete requests[clientId];
             this.setState({requests: requests});
         }
-    },
-    render: function() {
+    }
+
+    render() {
         return (
-            <span ref='input' className='btn btn-file'>
+            <span
+                ref='input'
+                className='btn btn-file'
+            >
                 <span>
                     <i className='glyphicon glyphicon-paperclip' />
                 </span>
-                <input ref='fileInput' type='file' onChange={this.handleChange} multiple/>
+                <input
+                    ref='fileInput'
+                    type='file'
+                    onChange={this.handleChange}
+                    multiple='true'
+                />
             </span>
         );
     }
-});
+}
+
+FileUpload.propTypes = {
+    onUploadError: React.PropTypes.func,
+    getFileCount: React.PropTypes.func,
+    onFileUpload: React.PropTypes.func,
+    onUploadStart: React.PropTypes.func,
+    channelId: React.PropTypes.string,
+    postType: React.PropTypes.string
+};

@@ -4,7 +4,6 @@
 package store
 
 import (
-	"fmt"
 	"github.com/mattermost/platform/model"
 	"github.com/mattermost/platform/utils"
 )
@@ -38,8 +37,7 @@ func NewSqlChannelStore(sqlStore *SqlStore) ChannelStore {
 }
 
 func (s SqlChannelStore) UpgradeSchemaIfNeeded() {
-	s.CreateColumnIfNotExists("Channels", "ExtraUpdateAt", "TotalMsgCount", "bigint(20)", "0")
-	s.CreateColumnIfNotExists("Channels", "CreatorId", "ExtraUpdateAt", "varchar(26)", "")
+	s.CreateColumnIfNotExists("Channels", "CreatorId", "varchar(26)", "character varying(26)", "")
 }
 
 func (s SqlChannelStore) CreateIndexesIfNotExists() {
@@ -154,10 +152,17 @@ func (s SqlChannelStore) extraUpdated(channel *model.Channel) StoreChannel {
 
 		channel.ExtraUpdated()
 
-		if count, err := s.GetMaster().Update(channel); err != nil {
+		_, err := s.GetMaster().Exec(
+			`UPDATE
+				Channels
+			SET
+				ExtraUpdateAt = :Time
+			WHERE
+				Id = :Id`,
+			map[string]interface{}{"Id": channel.Id, "Time": channel.ExtraUpdateAt})
+
+		if err != nil {
 			result.Err = model.NewAppError("SqlChannelStore.extraUpdated", "Problem updating members last updated time", "id="+channel.Id+", "+err.Error())
-		} else if count != 1 {
-			result.Err = model.NewAppError("SqlChannelStore.extraUpdated", "Problem updating members last updated time", fmt.Sprintf("id=%v, count=%v", channel.Id, count))
 		}
 
 		storeChannel <- result
@@ -665,6 +670,28 @@ func (s SqlChannelStore) UpdateNotifyLevel(channelId, userId, notifyLevel string
 			map[string]interface{}{"ChannelId": channelId, "UserId": userId, "NotifyLevel": notifyLevel, "LastUpdateAt": updateAt})
 		if err != nil {
 			result.Err = model.NewAppError("SqlChannelStore.UpdateNotifyLevel", "We couldn't update the notify level", "channel_id="+channelId+", user_id="+userId+", "+err.Error())
+		}
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
+func (s SqlChannelStore) GetForExport(teamId string) StoreChannel {
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		var data []*model.Channel
+		_, err := s.GetReplica().Select(&data, "SELECT * FROM Channels WHERE TeamId = :TeamId AND DeleteAt = 0 AND Type = 'O'", map[string]interface{}{"TeamId": teamId})
+
+		if err != nil {
+			result.Err = model.NewAppError("SqlChannelStore.GetAllChannels", "We couldn't get all the channels", "teamId="+teamId+", err="+err.Error())
+		} else {
+			result.Data = data
 		}
 
 		storeChannel <- result

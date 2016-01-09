@@ -9,20 +9,21 @@ var ActionTypes = Constants.ActionTypes;
 var AsyncClient = require('./async_client.jsx');
 var client = require('./client.jsx');
 var Autolinker = require('autolinker');
+import {config} from '../utils/config.js';
 
-module.exports.isEmail = function(email) {
+export function isEmail(email) {
     var regex = /^([a-zA-Z0-9_.+-])+\@(([a-zA-Z0-9-])+\.)+([a-zA-Z0-9]{2,4})+$/;
     return regex.test(email);
-};
+}
 
-module.exports.cleanUpUrlable = function(input) {
+export function cleanUpUrlable(input) {
     var cleaned = input.trim().replace(/-/g, ' ').replace(/[^\w\s]/gi, '').toLowerCase().replace(/\s/g, '-');
     cleaned = cleaned.replace(/^\-+/, '');
     cleaned = cleaned.replace(/\-+$/, '');
     return cleaned;
-};
+}
 
-module.exports.isTestDomain = function() {
+export function isTestDomain() {
     if ((/^localhost/).test(window.location.hostname)) {
         return true;
     }
@@ -52,38 +53,9 @@ module.exports.isTestDomain = function() {
     }
 
     return false;
-};
-
-function getSubDomain() {
-    if (module.exports.isTestDomain()) {
-        return '';
-    }
-
-    if ((/^www/).test(window.location.hostname)) {
-        return '';
-    }
-
-    if ((/^beta/).test(window.location.hostname)) {
-        return '';
-    }
-
-    if ((/^ci/).test(window.location.hostname)) {
-        return '';
-    }
-
-    var parts = window.location.hostname.split('.');
-
-    if (parts.length !== 3) {
-        return '';
-    }
-
-    return parts[0];
 }
 
-global.window.getSubDomain = getSubDomain;
-module.exports.getSubDomain = getSubDomain;
-
-module.exports.getDomainWithOutSub = function() {
+export function getDomainWithOutSub() {
     var parts = window.location.host.split('.');
 
     if (parts.length === 1) {
@@ -95,17 +67,17 @@ module.exports.getDomainWithOutSub = function() {
     }
 
     return parts[1] + '.' + parts[2];
-};
+}
 
-module.exports.getCookie = function(name) {
+export function getCookie(name) {
     var value = '; ' + document.cookie;
     var parts = value.split('; ' + name + '=');
     if (parts.length === 2) {
         return parts.pop().split(';').shift();
     }
-};
+}
 
-module.exports.notifyMe = function(title, body, channel) {
+export function notifyMe(title, body, channel) {
     if ('Notification' in window && Notification.permission !== 'denied') {
         Notification.requestPermission(function onRequestPermission(permission) {
             if (Notification.permission !== permission) {
@@ -117,7 +89,7 @@ module.exports.notifyMe = function(title, body, channel) {
                 notification.onclick = function onClick() {
                     window.focus();
                     if (channel) {
-                        module.exports.switchChannel(channel);
+                        switchChannel(channel);
                     } else {
                         window.location.href = '/';
                     }
@@ -128,16 +100,16 @@ module.exports.notifyMe = function(title, body, channel) {
             }
         });
     }
-};
+}
 
-module.exports.ding = function() {
-    if (!module.exports.isBrowserFirefox()) {
+export function ding() {
+    if (!isBrowserFirefox()) {
         var audio = new Audio('/static/images/ding.mp3');
         audio.play();
     }
-};
+}
 
-module.exports.getUrlParameter = function(sParam) {
+export function getUrlParameter(sParam) {
     var sPageURL = window.location.search.substring(1);
     var sURLVariables = sPageURL.split('&');
     for (var i = 0; i < sURLVariables.length; i++) {
@@ -147,20 +119,20 @@ module.exports.getUrlParameter = function(sParam) {
         }
     }
     return null;
-};
+}
 
-module.exports.getDateForUnixTicks = function(ticks) {
+export function getDateForUnixTicks(ticks) {
     return new Date(ticks);
-};
+}
 
-module.exports.displayDate = function(ticks) {
+export function displayDate(ticks) {
     var d = new Date(ticks);
     var monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
     return monthNames[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
-};
+}
 
-module.exports.displayTime = function(ticks) {
+export function displayTime(ticks) {
     var d = new Date(ticks);
     var hours = d.getHours();
     var minutes = d.getMinutes();
@@ -175,12 +147,12 @@ module.exports.displayTime = function(ticks) {
         hours = '12';
     }
     if (minutes <= 9) {
-        minutes = 0 + minutes;
+        minutes = '0' + minutes;
     }
     return hours + ':' + minutes + ' ' + ampm;
-};
+}
 
-module.exports.displayDateTime = function(ticks) {
+export function displayDateTime(ticks) {
     var seconds = Math.floor((Date.now() - ticks) / 1000);
 
     var interval = Math.floor(seconds / 3600);
@@ -203,16 +175,16 @@ module.exports.displayDateTime = function(ticks) {
     }
 
     return '1 minute ago';
-};
+}
 
-module.exports.displayCommentDateTime = function(ticks) {
-    return module.exports.displayDate(ticks) + ' ' + module.exports.displayTime(ticks);
+export function displayCommentDateTime(ticks) {
+    return displayDate(ticks) + ' ' + displayTime(ticks);
 }
 
 // returns Unix timestamp in milliseconds
-module.exports.getTimestamp = function() {
+export function getTimestamp() {
     return Date.now();
-};
+}
 
 function testUrlMatch(text) {
     var urlMatcher = new Autolinker.matchParser.MatchParser({
@@ -240,7 +212,7 @@ function testUrlMatch(text) {
     return result;
 }
 
-module.exports.extractLinks = function(text) {
+export function extractLinks(text) {
     var repRegex = new RegExp('<br>', 'g');
     var matches = testUrlMatch(text.replace(repRegex, '\n'));
 
@@ -254,16 +226,46 @@ module.exports.extractLinks = function(text) {
     }
 
     return {links: links, text: text};
-};
+}
 
-module.exports.escapeRegExp = function(string) {
+export function escapeRegExp(string) {
     return string.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1');
-};
+}
+
+function handleYoutubeTime(link) {
+    var timeRegex = /[\\?&]t=([0-9hms]+)/;
+
+    var time = link.trim().match(timeRegex);
+    if (!time || !time[1]) {
+        return '';
+    }
+
+    var hours = time[1].match(/([0-9]+)h/);
+    var minutes = time[1].match(/([0-9]+)m/);
+    var seconds = time[1].match(/([0-9]+)s/);
+
+    var ticks = 0;
+
+    if (hours && hours[1]) {
+        ticks += parseInt(hours[1], 10) * 3600;
+    }
+
+    if (minutes && minutes[1]) {
+        ticks += parseInt(minutes[1], 10) * 60;
+    }
+
+    if (seconds && seconds[1]) {
+        ticks += parseInt(seconds[1], 10);
+    }
+
+    return '&start=' + ticks.toString();
+}
 
 function getYoutubeEmbed(link) {
     var regex = /.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|watch\?(?:[a-zA-Z-_]+=[a-zA-Z0-9-_]+&)+v=)([^#\&\?]*).*/;
 
     var youtubeId = link.trim().match(regex)[1];
+    var time = handleYoutubeTime(link);
 
     function onClick(e) {
         var div = $(e.target).closest('.video-thumbnail__container')[0];
@@ -271,11 +273,13 @@ function getYoutubeEmbed(link) {
         iframe.setAttribute('src',
                             'https://www.youtube.com/embed/' +
                             div.id +
-                            '?autoplay=1&autohide=1&border=0&wmode=opaque&enablejsapi=1');
+                            '?autoplay=1&autohide=1&border=0&wmode=opaque&fs=1&enablejsapi=1' +
+                            time);
         iframe.setAttribute('width', '480px');
         iframe.setAttribute('height', '360px');
         iframe.setAttribute('type', 'text/html');
         iframe.setAttribute('frameborder', '0');
+        iframe.setAttribute('allowfullscreen', 'allowfullscreen');
 
         div.parentNode.replaceChild(iframe, div);
     }
@@ -285,10 +289,10 @@ function getYoutubeEmbed(link) {
             return;
         }
         var metadata = data.items[0].snippet;
+        $('.video-type.' + youtubeId).html('Youtube - ');
         $('.video-uploader.' + youtubeId).html(metadata.channelTitle);
         $('.video-title.' + youtubeId).find('a').html(metadata.title);
         $('.post-list-holder-by-time').scrollTop($('.post-list-holder-by-time')[0].scrollHeight);
-        $('.post-list-holder-by-time').perfectScrollbar('update');
     }
 
     if (config.GoogleDeveloperKey) {
@@ -296,22 +300,34 @@ function getYoutubeEmbed(link) {
             async: true,
             url: 'https://www.googleapis.com/youtube/v3/videos',
             type: 'GET',
-            data: {part: 'snippet', id: youtubeId, key:config.GoogleDeveloperKey},
+            data: {part: 'snippet', id: youtubeId, key: config.GoogleDeveloperKey},
             success: success
         });
     }
 
     return (
         <div className='post-comment'>
-            <h4 className='video-type'>YouTube</h4>
+            <h4>
+                <span className={'video-type ' + youtubeId}>YouTube</span>
+                <span className={'video-title ' + youtubeId}><a href={link}></a></span>
+            </h4>
             <h4 className={'video-uploader ' + youtubeId}></h4>
-            <h4 className={'video-title ' + youtubeId}><a href={link}></a></h4>
-            <div className='video-div embed-responsive-item' id={youtubeId} onClick={onClick}>
+            <div
+                className='video-div embed-responsive-item'
+                id={youtubeId}
+                onClick={onClick}
+            >
                 <div className='embed-responsive embed-responsive-4by3 video-div__placeholder'>
-                    <div id={youtubeId} className='video-thumbnail__container'>
-                        <img className='video-thumbnail' src={'https://i.ytimg.com/vi/' + youtubeId + '/hqdefault.jpg'}/>
+                    <div
+                        id={youtubeId}
+                        className='video-thumbnail__container'
+                    >
+                        <img
+                            className='video-thumbnail'
+                            src={'https://i.ytimg.com/vi/' + youtubeId + '/hqdefault.jpg'}
+                        />
                         <div className='block'>
-                            <span className='play-button'><span></span></span>
+                            <span className='play-button'><span/></span>
                         </div>
                     </div>
                 </div>
@@ -320,7 +336,7 @@ function getYoutubeEmbed(link) {
     );
 }
 
-module.exports.getEmbed = function(link) {
+export function getEmbed(link) {
     var ytRegex = /.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|watch\?(?:[a-zA-Z-_]+=[a-zA-Z0-9-_]+&)+v=)([^#\&\?]*).*/;
 
     var match = link.trim().match(ytRegex);
@@ -372,13 +388,13 @@ module.exports.getEmbed = function(link) {
         </div>
     );
     */
-};
+}
 
-module.exports.areStatesEqual = function(state1, state2) {
+export function areStatesEqual(state1, state2) {
     return JSON.stringify(state1) === JSON.stringify(state2);
-};
+}
 
-module.exports.replaceHtmlEntities = function(text) {
+export function replaceHtmlEntities(text) {
     var tagsToReplace = {
         '&amp;': '&',
         '&lt;': '<',
@@ -392,9 +408,9 @@ module.exports.replaceHtmlEntities = function(text) {
         }
     }
     return newtext;
-};
+}
 
-module.exports.insertHtmlEntities = function(text) {
+export function insertHtmlEntities(text) {
     var tagsToReplace = {
         '&': '&amp;',
         '<': '&lt;',
@@ -408,123 +424,216 @@ module.exports.insertHtmlEntities = function(text) {
         }
     }
     return newtext;
-};
+}
 
-module.exports.searchForTerm = function(term) {
+export function searchForTerm(term) {
     AppDispatcher.handleServerAction({
         type: ActionTypes.RECIEVED_SEARCH_TERM,
         term: term,
         do_search: true
     });
-};
+}
 
 var puncStartRegex = /^((?![@#])\W)+/g;
 var puncEndRegex = /(\W)+$/g;
 
-module.exports.textToJsx = function(text, options) {
-
-    if (options && options['singleline']) {
-        var repRegex = new RegExp('\n', 'g');
+export function textToJsx(textin, options) {
+    var text = textin;
+    if (options && options.singleline) {
+        var repRegex = new RegExp('\n', 'g'); //eslint-disable-line no-control-regex
         text = text.replace(repRegex, ' ');
     }
 
-    var searchTerm = ''
-    if (options && options['searchTerm']) {
-        searchTerm = options['searchTerm'].toLowerCase()
+    var searchTerm = '';
+    if (options && options.searchTerm) {
+        searchTerm = options.searchTerm.toLowerCase();
     }
 
     var mentionClass = 'mention-highlight';
-    if (options && options['noMentionHighlight']) {
+    if (options && options.noMentionHighlight) {
         mentionClass = '';
     }
 
     var inner = [];
 
     // Function specific regex
-    var hashRegex = /^href="#[^']+"|(#[A-Za-z]+[A-Za-z0-9_\-]*[A-Za-z0-9])$/g;
+    var hashRegex = /^href="#[^']+"|(^#[A-Za-z]+[A-Za-z0-9_\-]*[A-Za-z0-9])$/g;
 
     var implicitKeywords = UserStore.getCurrentMentionKeys();
 
     var lines = text.split('\n');
-    for (var i = 0; i < lines.length; i++) {
+    for (let i = 0; i < lines.length; i++) {
         var line = lines[i];
         var words = line.split(' ');
         var highlightSearchClass = '';
-        for (var z = 0; z < words.length; z++) {
+        for (let z = 0; z < words.length; z++) {
             var word = words[z];
             var trimWord = word.replace(puncStartRegex, '').replace(puncEndRegex, '').trim();
             var mentionRegex = /^(?:@)([a-z0-9_]+)$/gi; // looks loop invariant but a weird JS bug needs it to be redefined here
             var explicitMention = mentionRegex.exec(trimWord);
 
-            if ((trimWord.toLowerCase().indexOf(searchTerm) > -1 || word.toLowerCase().indexOf(searchTerm) > -1) && searchTerm != '') {
-
-                highlightSearchClass = ' search-highlight';
+            if (searchTerm !== '') {
+                let searchWords = searchTerm.split(' ');
+                for (let idx in searchWords) {
+                    if ({}.hasOwnProperty.call(searchWords, idx)) {
+                        let searchWord = searchWords[idx];
+                        if (searchWord === word.toLowerCase() || searchWord === trimWord.toLowerCase()) {
+                            highlightSearchClass = ' search-highlight';
+                            break;
+                        } else if (searchWord.charAt(searchWord.length - 1) === '*') {
+                            let searchWordPrefix = searchWord.slice(0, -1);
+                            if (trimWord.toLowerCase().indexOf(searchWordPrefix) > -1 || word.toLowerCase().indexOf(searchWordPrefix) > -1) {
+                                highlightSearchClass = ' search-highlight';
+                                break;
+                            }
+                        }
+                    }
+                }
             }
 
             if (explicitMention &&
                 (UserStore.getProfileByUsername(explicitMention[1]) ||
-                 Constants.SPECIAL_MENTIONS.indexOf(explicitMention[1]) !== -1))
-                {
-                    var name = explicitMention[1];
-                    // do both a non-case sensitive and case senstive check
-                    var mClass = implicitKeywords.indexOf('@'+name.toLowerCase()) !== -1 || implicitKeywords.indexOf('@'+name) !== -1 ? mentionClass : '';
+                 Constants.SPECIAL_MENTIONS.indexOf(explicitMention[1]) !== -1)) {
+                let name = explicitMention[1];
 
-                    var suffix = word.match(puncEndRegex);
-                    var prefix = word.match(puncStartRegex);
-
-                    if (searchTerm === name) {
-                        highlightSearchClass = ' search-highlight';
-                    }
-
-                    inner.push(<span key={name+i+z+'_span'}>{prefix}<a className={mClass + highlightSearchClass + ' mention-link'} key={name+i+z+'_link'} href='#' onClick={function(value) { return function() { module.exports.searchForTerm(value); } }(name)}>@{name}</a>{suffix} </span>);
-                } else if (testUrlMatch(word).length) {
-                    var match = testUrlMatch(word)[0];
-                    var link = match.link;
-
-                    var prefix = word.substring(0,word.indexOf(match.text));
-                    var suffix = word.substring(word.indexOf(match.text)+match.text.length);
-
-                    inner.push(<span key={word+i+z+'_span'}>{prefix}<a key={word+i+z+'_link'} className={'theme' + highlightSearchClass} target='_blank' href={link}>{match.text}</a>{suffix} </span>);
-
-                } else if (trimWord.match(hashRegex)) {
-                    var suffix = word.match(puncEndRegex);
-                    var prefix = word.match(puncStartRegex);
-                    var mClass = implicitKeywords.indexOf(trimWord) !== -1 || implicitKeywords.indexOf(trimWord.toLowerCase()) !== -1 ? mentionClass : '';
-
-                    if (searchTerm === trimWord.substring(1).toLowerCase() || searchTerm === trimWord.toLowerCase()) {
-                        highlightSearchClass = ' search-highlight';
-                    }
-
-                    inner.push(<span key={word+i+z+'_span'}>{prefix}<a key={word+i+z+'_hash'} className={'theme ' + mClass + highlightSearchClass} href='#' onClick={function(value) { return function() { module.exports.searchForTerm(value); } }(trimWord)}>{trimWord}</a>{suffix} </span>);
-
-                } else if (implicitKeywords.indexOf(trimWord) !== -1 || implicitKeywords.indexOf(trimWord.toLowerCase()) !== -1) {
-                    var suffix = word.match(puncEndRegex);
-                    var prefix = word.match(puncStartRegex);
-
-                    if (trimWord.charAt(0) === '@') {
-                        if (searchTerm === trimWord.substring(1).toLowerCase()) {
-                            highlightSearchClass = ' search-highlight';
-                        }
-                        inner.push(<span key={word+i+z+'_span'} key={name+i+z+'_span'}>{prefix}<a className={mentionClass + highlightSearchClass} key={name+i+z+'_link'} href='#'>{trimWord}</a>{suffix} </span>);
-                    } else {
-                        inner.push(<span key={word+i+z+'_span'}>{prefix}<span className={mentionClass + highlightSearchClass}>{module.exports.replaceHtmlEntities(trimWord)}</span>{suffix} </span>);
-                    }
-
-                } else if (word === '') {
-                    // if word is empty dont include a span
-                } else {
-                    inner.push(<span key={word+i+z+'_span'}><span className={highlightSearchClass}>{module.exports.replaceHtmlEntities(word)}</span> </span>);
+                // do both a non-case sensitive and case senstive check
+                let mClass = '';
+                if (implicitKeywords.indexOf('@' + name.toLowerCase()) !== -1 || implicitKeywords.indexOf('@' + name) !== -1) {
+                    mClass = mentionClass;
                 }
-                highlightSearchClass = '';
+
+                let suffix = word.match(puncEndRegex);
+                let prefix = word.match(puncStartRegex);
+
+                if (searchTerm === name) {
+                    highlightSearchClass = ' search-highlight';
+                }
+
+                inner.push(
+                    <span key={name + i + z + '_span'}>
+                        {prefix}
+                        <a
+                            className={mClass + highlightSearchClass + ' mention-link'}
+                            key={name + i + z + '_link'}
+                            href='#'
+                            onClick={() => searchForTerm(name)} //eslint-disable-line no-loop-func
+                        >
+                            @{name}
+                        </a>
+                        {suffix}
+                        {' '}
+                    </span>
+                );
+            } else if (testUrlMatch(word).length) {
+                let match = testUrlMatch(word)[0];
+                let link = match.link;
+
+                let prefix = word.substring(0, word.indexOf(match.text));
+                let suffix = word.substring(word.indexOf(match.text) + match.text.length);
+
+                inner.push(
+                    <span key={word + i + z + '_span'}>
+                        {prefix}
+                        <a
+                            key={word + i + z + '_link'}
+                            className={'theme' + highlightSearchClass}
+                            target='_blank'
+                            href={link}
+                        >
+                            {match.text}
+                        </a>
+                        {suffix}
+                        {' '}
+                    </span>
+                );
+            } else if (trimWord.match(hashRegex)) {
+                let suffix = word.match(puncEndRegex);
+                let prefix = word.match(puncStartRegex);
+                let mClass = '';
+                if (implicitKeywords.indexOf(trimWord) !== -1 || implicitKeywords.indexOf(trimWord.toLowerCase()) !== -1) {
+                    mClass = mentionClass;
+                }
+
+                if (searchTerm === trimWord.substring(1).toLowerCase() || searchTerm === trimWord.toLowerCase()) {
+                    highlightSearchClass = ' search-highlight';
+                }
+
+                inner.push(
+                    <span key={word + i + z + '_span'}>
+                        {prefix}
+                        <a
+                            key={word + i + z + '_hash'}
+                            className={'theme ' + mClass + highlightSearchClass}
+                            href='#'
+                            onClick={searchForTerm.bind(this, trimWord)} //eslint-disable-line no-loop-func
+                        >
+                            {trimWord}
+                        </a>
+                        {suffix}
+                        {' '}
+                    </span>
+                );
+            } else if (implicitKeywords.indexOf(trimWord) !== -1 || implicitKeywords.indexOf(trimWord.toLowerCase()) !== -1) {
+                let suffix = word.match(puncEndRegex);
+                let prefix = word.match(puncStartRegex);
+
+                if (trimWord.charAt(0) === '@') {
+                    if (searchTerm === trimWord.substring(1).toLowerCase()) {
+                        highlightSearchClass = ' search-highlight';
+                    }
+                    inner.push(
+                        <span key={word + i + z + '_span'}>
+                            {prefix}
+                            <a
+                                className={mentionClass + highlightSearchClass}
+                                key={name + i + z + '_link'}
+                                href='#'
+                            >
+                                {trimWord}
+                            </a>
+                            {suffix}
+                            {' '}
+                        </span>
+                    );
+                } else {
+                    inner.push(
+                        <span key={word + i + z + '_span'}>
+                            {prefix}
+                            <span className={mentionClass + highlightSearchClass}>
+                                {replaceHtmlEntities(trimWord)}
+                            </span>
+                            {suffix}
+                            {' '}
+                        </span>
+                    );
+                }
+            } else if (word === '') {
+
+                // if word is empty dont include a span
+
+            } else {
+                inner.push(
+                    <span key={word + i + z + '_span'}>
+                        <span className={highlightSearchClass}>
+                            {replaceHtmlEntities(word)}
+                        </span>
+                        {' '}
+                    </span>
+                );
+            }
+            highlightSearchClass = '';
         }
-        if (i != lines.length-1)
-            inner.push(<br key={'br_'+i+z}/>);
+        if (i !== lines.length - 1) {
+            inner.push(
+                <br key={'br_' + i}/>
+            );
+        }
     }
 
     return inner;
 }
 
-module.exports.getFileType = function(extin) {
+export function getFileType(extin) {
     var ext = extin.toLowerCase();
     if (Constants.IMAGE_TYPES.indexOf(ext) > -1) {
         return 'image';
@@ -550,8 +659,8 @@ module.exports.getFileType = function(extin) {
         return 'word';
     }
 
-    if (Constants.EXCEL_TYPES.indexOf(ext) > -1) {
-        return 'excel';
+    if (Constants.PRESENTATION_TYPES.indexOf(ext) > -1) {
+        return 'presentation';
     }
 
     if (Constants.PDF_TYPES.indexOf(ext) > -1) {
@@ -563,9 +672,9 @@ module.exports.getFileType = function(extin) {
     }
 
     return 'other';
-};
+}
 
-module.exports.getPreviewImagePathForFileType = function(fileTypeIn) {
+export function getPreviewImagePathForFileType(fileTypeIn) {
     var fileType = fileTypeIn.toLowerCase();
 
     var icon;
@@ -576,9 +685,9 @@ module.exports.getPreviewImagePathForFileType = function(fileTypeIn) {
     }
 
     return '/static/images/icons/' + icon + '.png';
-};
+}
 
-module.exports.getIconClassName = function(fileTypeIn) {
+export function getIconClassName(fileTypeIn) {
     var fileType = fileTypeIn.toLowerCase();
 
     if (fileType in Constants.ICON_FROM_TYPE) {
@@ -586,9 +695,9 @@ module.exports.getIconClassName = function(fileTypeIn) {
     }
 
     return 'glyphicon-file';
-};
+}
 
-module.exports.splitFileLocation = function(fileLocation) {
+export function splitFileLocation(fileLocation) {
     var fileSplit = fileLocation.split('.');
 
     var ext = '';
@@ -601,33 +710,16 @@ module.exports.splitFileLocation = function(fileLocation) {
     var filename = filePath.split('/')[filePath.split('/').length - 1];
 
     return {ext: ext, name: filename, path: filePath};
-};
+}
 
-// Asynchronously gets the size of a file by requesting its headers. If successful, it calls the
-// provided callback with the file size in bytes as the argument.
-module.exports.getFileSize = function(url, callback) {
-    var request = new XMLHttpRequest();
-
-    request.open('HEAD', url, true);
-    request.onreadystatechange = function onReadyStateChange() {
-        if (request.readyState === 4 && request.status === 200) {
-            if (callback) {
-                callback(parseInt(request.getResponseHeader('content-length'), 10));
-            }
-        }
-    };
-
-    request.send();
-};
-
-module.exports.toTitleCase = function(str) {
+export function toTitleCase(str) {
     function doTitleCase(txt) {
         return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
     }
     return str.replace(/\w\S*/g, doTitleCase);
-};
+}
 
-module.exports.changeCss = function(className, classValue) {
+export function changeCss(className, classValue) {
     // we need invisible container to store additional css definitions
     var cssMainContainer = $('#css-modifier-container');
     if (cssMainContainer.length === 0) {
@@ -645,9 +737,9 @@ module.exports.changeCss = function(className, classValue) {
 
     // append additional style
     classContainer.html('<style>' + className + ' {' + classValue + '}</style>');
-};
+}
 
-module.exports.rgb2hex = function(rgbIn) {
+export function rgb2hex(rgbIn) {
     if (/^#[0-9A-F]{6}$/i.test(rgbIn)) {
         return rgbIn;
     }
@@ -657,9 +749,9 @@ module.exports.rgb2hex = function(rgbIn) {
         return ('0' + parseInt(x, 10).toString(16)).slice(-2);
     }
     return '#' + hex(rgb[1]) + hex(rgb[2]) + hex(rgb[3]);
-};
+}
 
-module.exports.placeCaretAtEnd = function(el) {
+export function placeCaretAtEnd(el) {
     el.focus();
     if (typeof window.getSelection != 'undefined' && typeof document.createRange != 'undefined') {
         var range = document.createRange();
@@ -674,9 +766,9 @@ module.exports.placeCaretAtEnd = function(el) {
         textRange.collapse(false);
         textRange.select();
     }
-};
+}
 
-module.exports.getCaretPosition = function(el) {
+export function getCaretPosition(el) {
     if (el.selectionStart) {
         return el.selectionStart;
     } else if (document.selection) {
@@ -695,9 +787,9 @@ module.exports.getCaretPosition = function(el) {
         return rc.text.length;
     }
     return 0;
-};
+}
 
-module.exports.setSelectionRange = function(input, selectionStart, selectionEnd) {
+export function setSelectionRange(input, selectionStart, selectionEnd) {
     if (input.setSelectionRange) {
         input.focus();
         input.setSelectionRange(selectionStart, selectionEnd);
@@ -708,13 +800,13 @@ module.exports.setSelectionRange = function(input, selectionStart, selectionEnd)
         range.moveStart('character', selectionStart);
         range.select();
     }
-};
+}
 
-module.exports.setCaretPosition = function(input, pos) {
-    module.exports.setSelectionRange(input, pos, pos);
-};
+export function setCaretPosition(input, pos) {
+    setSelectionRange(input, pos, pos);
+}
 
-module.exports.getSelectedText = function(input) {
+export function getSelectedText(input) {
     var selectedText;
     if (typeof document.selection !== 'undefined') {
         input.focus();
@@ -727,9 +819,9 @@ module.exports.getSelectedText = function(input) {
     }
 
     return selectedText;
-};
+}
 
-module.exports.isValidUsername = function(name) {
+export function isValidUsername(name) {
     var error = '';
     if (!name) {
         error = 'This field is required';
@@ -751,20 +843,18 @@ module.exports.isValidUsername = function(name) {
     }
 
     return error;
-};
+}
 
-function updateTabTitle(name) {
+export function updateTabTitle(name) {
     document.title = name + ' ' + document.title.substring(document.title.lastIndexOf('-'));
 }
-module.exports.updateTabTitle = updateTabTitle;
 
-function updateAddressBar(channelName) {
+export function updateAddressBar(channelName) {
     var teamURL = window.location.href.split('/channels')[0];
     history.replaceState('data', '', teamURL + '/channels/' + channelName);
 }
-module.exports.updateAddressBar = updateAddressBar;
 
-function switchChannel(channel, teammateName) {
+export function switchChannel(channel, teammateName) {
     AppDispatcher.handleViewAction({
         type: ActionTypes.CLICK_CHANNEL,
         name: channel.name,
@@ -781,7 +871,7 @@ function switchChannel(channel, teammateName) {
 
     AsyncClient.getChannels(true, true, true);
     AsyncClient.getChannelExtraInfo(true);
-    AsyncClient.getPosts(true, channel.id, Constants.POST_CHUNK_SIZE);
+    AsyncClient.getPosts(channel.id);
 
     $('.inner__wrap').removeClass('move--right');
     $('.sidebar--left').removeClass('move--right');
@@ -790,20 +880,19 @@ function switchChannel(channel, teammateName) {
 
     return false;
 }
-module.exports.switchChannel = switchChannel;
 
-module.exports.isMobile = function() {
+export function isMobile() {
     return screen.width <= 768;
-};
+}
 
-module.exports.isComment = function(post) {
+export function isComment(post) {
     if ('root_id' in post) {
         return post.root_id !== '';
     }
     return false;
-};
+}
 
-module.exports.getDirectTeammate = function(channelId) {
+export function getDirectTeammate(channelId) {
     var userIds = ChannelStore.get(channelId).name.split('__');
     var curUserId = UserStore.getCurrentId();
     var teammate = {};
@@ -820,9 +909,9 @@ module.exports.getDirectTeammate = function(channelId) {
     }
 
     return teammate;
-};
+}
 
-Image.prototype.load = function(url, progressCallback) {
+Image.prototype.load = function imageLoad(url, progressCallback) {
     var self = this;
     var xmlHTTP = new XMLHttpRequest();
     xmlHTTP.open('GET', url, true);
@@ -849,7 +938,7 @@ Image.prototype.load = function(url, progressCallback) {
 
 Image.prototype.completedPercentage = 0;
 
-module.exports.changeColor = function(colourIn, amt) {
+export function changeColor(colourIn, amt) {
     var usePound = false;
     var col = colourIn;
 
@@ -890,10 +979,9 @@ module.exports.changeColor = function(colourIn, amt) {
     }
 
     return pound + String('000000' + (g | (b << 8) | (r << 16)).toString(16)).slice(-6);
-};
+}
 
-module.exports.changeOpacity = function(oldColor, opacity) {
-
+export function changeOpacity(oldColor, opacity) {
     var col = oldColor;
     if (col[0] === '#') {
         col = col.slice(1);
@@ -904,9 +992,9 @@ module.exports.changeOpacity = function(oldColor, opacity) {
     var b = parseInt(col.substring(4, 6), 16);
 
     return 'rgba(' + r + ',' + g + ',' + b + ',' + opacity + ')';
-};
+}
 
-module.exports.getFullName = function(user) {
+export function getFullName(user) {
     if (user.first_name && user.last_name) {
         return user.first_name + ' ' + user.last_name;
     } else if (user.first_name) {
@@ -916,23 +1004,23 @@ module.exports.getFullName = function(user) {
     }
 
     return '';
-};
+}
 
-module.exports.getDisplayName = function(user) {
+export function getDisplayName(user) {
     if (user.nickname && user.nickname.trim().length > 0) {
         return user.nickname;
     }
-    var fullName = module.exports.getFullName(user);
+    var fullName = getFullName(user);
 
     if (fullName) {
         return fullName;
     }
 
     return user.username;
-};
+}
 
 //IE10 does not set window.location.origin automatically so this must be called instead when using it
-module.exports.getWindowLocationOrigin = function() {
+export function getWindowLocationOrigin() {
     var windowLocationOrigin = window.location.origin;
     if (!windowLocationOrigin) {
         windowLocationOrigin = window.location.protocol + '//' + window.location.hostname;
@@ -941,10 +1029,10 @@ module.exports.getWindowLocationOrigin = function() {
         }
     }
     return windowLocationOrigin;
-};
+}
 
 // Converts a file size in bytes into a human-readable string of the form '123MB'.
-module.exports.fileSizeToString = function(bytes) {
+export function fileSizeToString(bytes) {
     // it's unlikely that we'll have files bigger than this
     if (bytes > 1024 * 1024 * 1024 * 1024) {
         return Math.floor(bytes / (1024 * 1024 * 1024 * 1024)) + 'TB';
@@ -957,29 +1045,29 @@ module.exports.fileSizeToString = function(bytes) {
     }
 
     return bytes + 'B';
-};
+}
 
 // Converts a filename (like those attached to Post objects) to a url that can be used to retrieve attachments from the server.
-module.exports.getFileUrl = function(filename) {
+export function getFileUrl(filename) {
     var url = filename;
 
     // This is a temporary patch to fix issue with old files using absolute paths
     if (url.indexOf('/api/v1/files/get') !== -1) {
         url = filename.split('/api/v1/files/get')[1];
     }
-    url = module.exports.getWindowLocationOrigin() + '/api/v1/files/get' + url;
+    url = getWindowLocationOrigin() + '/api/v1/files/get' + url;
 
     return url;
-};
+}
 
 // Gets the name of a file (including extension) from a given url or file path.
-module.exports.getFileName = function(path) {
+export function getFileName(path) {
     var split = path.split('/');
     return split[split.length - 1];
-};
+}
 
 // Generates a RFC-4122 version 4 compliant globally unique identifier.
-module.exports.generateId = function() {
+export function generateId() {
     // implementation taken from http://stackoverflow.com/a/2117523
     var id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
 
@@ -997,14 +1085,29 @@ module.exports.generateId = function() {
     });
 
     return id;
-};
+}
 
-module.exports.isBrowserFirefox = function() {
+export function isBrowserFirefox() {
     return navigator && navigator.userAgent && navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-};
+}
+
+// Checks if browser is IE10 or IE11
+export function isBrowserIE() {
+    if (window.navigator && window.navigator.userAgent) {
+        var ua = window.navigator.userAgent;
+
+        return ua.indexOf('Trident/7.0') > 0 || ua.indexOf('Trident/6.0') > 0;
+    }
+
+    return false;
+}
+
+export function isBrowserEdge() {
+    return window.naviagtor && navigator.userAgent && navigator.userAgent.toLowerCase().indexOf('edge') > -1;
+}
 
 // Used to get the id of the other user from a DM channel
-module.exports.getUserIdFromChannelName = function(channel) {
+export function getUserIdFromChannelName(channel) {
     var ids = channel.name.split('__');
     var otherUserId = '';
     if (ids[0] === UserStore.getCurrentId()) {
@@ -1014,13 +1117,13 @@ module.exports.getUserIdFromChannelName = function(channel) {
     }
 
     return otherUserId;
-};
+}
 
-module.exports.importSlack = function(file, success, error) {
+export function importSlack(file, success, error) {
     var formData = new FormData();
     formData.append('file', file, file.name);
     formData.append('filesize', file.size);
     formData.append('importFrom', 'slack');
 
     client.importSlack(formData, success, error);
-};
+}
