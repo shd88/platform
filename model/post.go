@@ -120,9 +120,7 @@ func (o *Post) PreSave() {
 
 	o.OriginalId = ""
 
-	if o.CreateAt <= 0 {
-		o.CreateAt = GetMillis()
-	}
+	o.CreateAt = GetMillis()
 	o.UpdateAt = o.CreateAt
 
 	if o.Props == nil {
@@ -148,4 +146,7 @@ func (o *Post) AddProp(key string, value string) {
 	o.MakeNonNil()
 
 	o.Props[key] = value
+}
+
+func (o *Post) PreExport() {
 }

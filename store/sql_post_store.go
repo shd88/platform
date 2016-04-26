@@ -5,10 +5,11 @@ package store
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/mattermost/platform/model"
 	"github.com/mattermost/platform/utils"
-	"strconv"
-	"strings"
 )
 
 type SqlPostStore struct {
@@ -36,11 +37,6 @@ func NewSqlPostStore(sqlStore *SqlStore) PostStore {
 }
 
 func (s SqlPostStore) UpgradeSchemaIfNeeded() {
-
-	// These execs are for upgrading currently created databases to full utf8mb4 compliance
-	// Will be removed as seen fit for upgrading
-	s.GetMaster().Exec("ALTER TABLE Posts charset=utf8mb4")
-	s.GetMaster().Exec("ALTER TABLE Posts MODIFY COLUMN Message varchar(4000) CHARACTER SET utf8mb4")
 }
 
 func (s SqlPostStore) CreateIndexesIfNotExists() {
@@ -158,14 +154,6 @@ func (s SqlPostStore) Get(id string) StoreChannel {
 			result.Err = model.NewAppError("SqlPostStore.GetPost", "We couldn't get the post", "id="+id+err.Error())
 		}
 
-		if post.ImgCount > 0 {
-			post.Filenames = []string{}
-			for i := 0; int64(i) < post.ImgCount; i++ {
-				fileUrl := "/api/v1/files/get_image/" + post.ChannelId + "/" + post.Id + "/" + strconv.Itoa(i+1) + ".png"
-				post.Filenames = append(post.Filenames, fileUrl)
-			}
-		}
-
 		pl.AddPost(&post)
 		pl.AddOrder(id)
 
@@ -265,29 +253,73 @@ func (s SqlPostStore) GetPosts(channelId string, offset int, limit int) StoreCha
 			list := &model.PostList{Order: make([]string, 0, len(posts))}
 
 			for _, p := range posts {
-				if p.ImgCount > 0 {
-					p.Filenames = []string{}
-					for i := 0; int64(i) < p.ImgCount; i++ {
-						fileUrl := "/api/v1/files/get_image/" + p.ChannelId + "/" + p.Id + "/" + strconv.Itoa(i+1) + ".png"
-						p.Filenames = append(p.Filenames, fileUrl)
-					}
-				}
 				list.AddPost(p)
 				list.AddOrder(p.Id)
 			}
 
 			for _, p := range parents {
-				if p.ImgCount > 0 {
-					p.Filenames = []string{}
-					for i := 0; int64(i) < p.ImgCount; i++ {
-						fileUrl := "/api/v1/files/get_image/" + p.ChannelId + "/" + p.Id + "/" + strconv.Itoa(i+1) + ".png"
-						p.Filenames = append(p.Filenames, fileUrl)
-					}
-				}
 				list.AddPost(p)
 			}
 
 			list.MakeNonNil()
+
+			result.Data = list
+		}
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
+func (s SqlPostStore) GetPostsSince(channelId string, time int64) StoreChannel {
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		var posts []*model.Post
+		_, err := s.GetReplica().Select(&posts,
+			`(SELECT
+			    *
+			FROM
+			    Posts
+			WHERE
+			    (UpdateAt > :Time
+			        AND ChannelId = :ChannelId)
+			LIMIT 1000)
+			UNION
+			(SELECT
+			    *
+			FROM
+			    Posts
+			WHERE
+			    Id
+			IN
+			    (SELECT * FROM (SELECT
+			        RootId
+			    FROM
+			        Posts
+			    WHERE
+			        UpdateAt > :Time
+			            AND ChannelId = :ChannelId
+			    LIMIT 1000) temp_tab))
+			ORDER BY CreateAt DESC`,
+			map[string]interface{}{"ChannelId": channelId, "Time": time})
+
+		if err != nil {
+			result.Err = model.NewAppError("SqlPostStore.GetPostsSince", "We couldn't get the posts for the channel", "channelId="+channelId+err.Error())
+		} else {
+
+			list := &model.PostList{Order: make([]string, 0, len(posts))}
+
+			for _, p := range posts {
+				list.AddPost(p)
+				if p.UpdateAt > time {
+					list.AddOrder(p.Id)
+				}
+			}
 
 			result.Data = list
 		}
@@ -328,7 +360,7 @@ func (s SqlPostStore) getParentsPosts(channelId string, offset int, limit int) S
 
 		var posts []*model.Post
 		_, err := s.GetReplica().Select(&posts,
-			`SELECT 
+			`SELECT
 			    q2.*
 			FROM
 			    Posts q2
@@ -336,7 +368,7 @@ func (s SqlPostStore) getParentsPosts(channelId string, offset int, limit int) S
 			    (SELECT DISTINCT
 			        q3.RootId
 			    FROM
-			        (SELECT 
+			        (SELECT
 			        RootId
 			    FROM
 			        Posts
@@ -344,7 +376,8 @@ func (s SqlPostStore) getParentsPosts(channelId string, offset int, limit int) S
 			        ChannelId = :ChannelId1
 			            AND DeleteAt = 0
 			    ORDER BY CreateAt DESC
-			    LIMIT :Limit OFFSET :Offset) q3) q1 ON q1.RootId = q2.RootId
+			    LIMIT :Limit OFFSET :Offset) q3
+			    WHERE q3.RootId != '') q1 ON q1.RootId = q2.Id
 			WHERE
 			    ChannelId = :ChannelId2
 			        AND DeleteAt = 0
@@ -386,6 +419,12 @@ func (s SqlPostStore) Search(teamId string, userId string, terms string, isHasht
 		var posts []*model.Post
 
 		if utils.Cfg.SqlSettings.DriverName == "postgres" {
+
+			// Parse text for wildcards
+			if wildcard, err := regexp.Compile("\\*($| )"); err == nil {
+				terms = wildcard.ReplaceAllLiteralString(terms, ":* ")
+			}
+
 			searchQuery := fmt.Sprintf(`SELECT
 				    *
 				FROM
@@ -460,6 +499,30 @@ func (s SqlPostStore) Search(teamId string, userId string, terms string, isHasht
 		list.MakeNonNil()
 
 		result.Data = list
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
+func (s SqlPostStore) GetForExport(channelId string) StoreChannel {
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		var posts []*model.Post
+		_, err := s.GetReplica().Select(
+			&posts,
+			"SELECT * FROM Posts WHERE ChannelId = :ChannelId AND DeleteAt = 0",
+			map[string]interface{}{"ChannelId": channelId})
+		if err != nil {
+			result.Err = model.NewAppError("SqlPostStore.GetForExport", "We couldn't get the posts for the channel", "channelId="+channelId+err.Error())
+		} else {
+			result.Data = posts
+		}
 
 		storeChannel <- result
 		close(storeChannel)

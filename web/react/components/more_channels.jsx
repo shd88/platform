@@ -29,12 +29,12 @@ export default class MoreChannels extends React.Component {
     }
     componentDidMount() {
         ChannelStore.addMoreChangeListener(this.onListenerChange);
-        $(this.refs.modal.getDOMNode()).on('shown.bs.modal', function shown() {
+        $(React.findDOMNode(this.refs.modal)).on('shown.bs.modal', function shown() {
             asyncClient.getMoreChannels(true);
         });
 
         var self = this;
-        $(this.refs.modal.getDOMNode()).on('show.bs.modal', function show(e) {
+        $(React.findDOMNode(this.refs.modal)).on('show.bs.modal', function show(e) {
             var button = e.relatedTarget;
             self.setState({channelType: $(button).attr('data-channeltype')});
         });
@@ -52,7 +52,7 @@ export default class MoreChannels extends React.Component {
         this.setState({joiningChannel: channelIndex});
         client.joinChannel(channel.id,
             function joinSuccess() {
-                $(this.refs.modal.getDOMNode()).modal('hide');
+                $(React.findDOMNode(this.refs.modal)).modal('hide');
                 asyncClient.getChannel(channel.id);
                 utils.switchChannel(channel);
                 this.setState({joiningChannel: -1});
@@ -65,7 +65,7 @@ export default class MoreChannels extends React.Component {
         );
     }
     handleNewChannel() {
-        $(this.refs.modal.getDOMNode()).modal('hide');
+        $(React.findDOMNode(this.refs.modal)).modal('hide');
     }
     render() {
         var serverError;
@@ -86,15 +86,21 @@ export default class MoreChannels extends React.Component {
                                 {channels.map(function cMap(channel, index) {
                                     var joinButton;
                                     if (self.state.joiningChannel === index) {
-                                        joinButton = (<img
-                                                        className='join-channel-loading-gif'
-                                                        src='/static/images/load.gif'
-                                                    />);
+                                        joinButton = (
+                                            <img
+                                                className='join-channel-loading-gif'
+                                                src='/static/images/load.gif'
+                                            />
+                                            );
                                     } else {
-                                        joinButton = (<button
-                                                        onClick={self.handleJoin.bind(self, channel, index)}
-                                                        className='btn btn-primary'>Join
-                                                    </button>);
+                                        joinButton = (
+                                            <button
+                                                onClick={self.handleJoin.bind(self, channel, index)}
+                                                className='btn btn-primary'
+                                            >
+                                                Join
+                                            </button>
+                                            );
                                     }
 
                                     return (
@@ -152,7 +158,9 @@ export default class MoreChannels extends React.Component {
                                 data-channeltype={this.state.channelType}
                                 type='button'
                                 className='btn btn-primary channel-create-btn'
-                                onClick={this.handleNewChannel}>Create New Channel
+                                onClick={this.handleNewChannel}
+                            >
+                                Create New Channel
                             </button>
                         </div>
                         <div className='modal-body'>

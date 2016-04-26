@@ -44,6 +44,7 @@ type TeamStore interface {
 	Get(id string) StoreChannel
 	GetByName(name string) StoreChannel
 	GetTeamsForEmail(domain string) StoreChannel
+	GetForExport() StoreChannel
 }
 
 type ChannelStore interface {
@@ -55,6 +56,7 @@ type ChannelStore interface {
 	GetChannels(teamId string, userId string) StoreChannel
 	GetMoreChannels(teamId string, userId string) StoreChannel
 	GetChannelCounts(teamId string, userId string) StoreChannel
+	GetForExport(teamId string) StoreChannel
 
 	SaveMember(member *model.ChannelMember) StoreChannel
 	GetMembers(channelId string) StoreChannel
@@ -75,8 +77,10 @@ type PostStore interface {
 	Get(id string) StoreChannel
 	Delete(postId string, time int64) StoreChannel
 	GetPosts(channelId string, offset int, limit int) StoreChannel
+	GetPostsSince(channelId string, time int64) StoreChannel
 	GetEtag(channelId string) StoreChannel
 	Search(teamId string, userId string, terms string, isHashtagSearch bool) StoreChannel
+	GetForExport(channelId string) StoreChannel
 }
 
 type UserStore interface {
@@ -95,6 +99,7 @@ type UserStore interface {
 	VerifyEmail(userId string) StoreChannel
 	GetEtagForProfiles(teamId string) StoreChannel
 	UpdateFailedPasswordAttempts(userId string, attempts int) StoreChannel
+	GetForExport(teamId string) StoreChannel
 }
 
 type SessionStore interface {

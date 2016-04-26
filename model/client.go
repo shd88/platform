@@ -522,6 +522,15 @@ func (c *Client) GetPosts(channelId string, offset int, limit int, etag string) 
 	}
 }
 
+func (c *Client) GetPostsSince(channelId string, time int64) (*Result, *AppError) {
+	if r, err := c.DoGet(fmt.Sprintf("/channels/%v/posts/%v", channelId, time), "", ""); err != nil {
+		return nil, err
+	} else {
+		return &Result{r.Header.Get(HEADER_REQUEST_ID),
+			r.Header.Get(HEADER_ETAG_SERVER), PostListFromJson(r.Body)}, nil
+	}
+}
+
 func (c *Client) GetPost(channelId string, postId string, etag string) (*Result, *AppError) {
 	if r, err := c.DoGet(fmt.Sprintf("/channels/%v/post/%v", channelId, postId), "", etag); err != nil {
 		return nil, err
@@ -586,6 +595,24 @@ func (c *Client) GetFile(url string, isFullUrl bool) (*Result, *AppError) {
 	} else {
 		return &Result{rp.Header.Get(HEADER_REQUEST_ID),
 			rp.Header.Get(HEADER_ETAG_SERVER), rp.Body}, nil
+	}
+}
+
+func (c *Client) GetFileInfo(url string) (*Result, *AppError) {
+	var rq *http.Request
+	rq, _ = http.NewRequest("GET", c.Url+"/files/get_info"+url, nil)
+
+	if len(c.AuthToken) > 0 {
+		rq.Header.Set(HEADER_AUTH, "BEARER "+c.AuthToken)
+	}
+
+	if rp, err := c.HttpClient.Do(rq); err != nil {
+		return nil, NewAppError(url, "We encountered an error while connecting to the server", err.Error())
+	} else if rp.StatusCode >= 300 {
+		return nil, AppErrorFromJson(rp.Body)
+	} else {
+		return &Result{rp.Header.Get(HEADER_REQUEST_ID),
+			rp.Header.Get(HEADER_ETAG_SERVER), MapFromJson(rp.Body)}, nil
 	}
 }
 

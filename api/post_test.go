@@ -331,7 +331,7 @@ func TestGetPosts(t *testing.T) {
 		t.Fatal("wrong order")
 	}
 
-	if len(r1.Posts) != 4 {
+	if len(r1.Posts) != 2 { // 3a1 and 3; 3a1's parent already there
 		t.Fatal("wrong size")
 	}
 
@@ -345,9 +345,79 @@ func TestGetPosts(t *testing.T) {
 		t.Fatal("wrong order")
 	}
 
-	if len(r2.Posts) != 4 {
+	if len(r2.Posts) != 3 { // 2 and 1a1; + 1a1's parent
 		t.Log(r2.Posts)
 		t.Fatal("wrong size")
+	}
+}
+
+func TestGetPostsSince(t *testing.T) {
+	Setup()
+
+	team := &model.Team{DisplayName: "Name", Name: "z-z-" + model.NewId() + "a", Email: "test@nowhere.com", Type: model.TEAM_OPEN}
+	team = Client.Must(Client.CreateTeam(team)).Data.(*model.Team)
+
+	user1 := &model.User{TeamId: team.Id, Email: model.NewId() + "corey@test.com", Nickname: "Corey Hulen", Password: "pwd"}
+	user1 = Client.Must(Client.CreateUser(user1, "")).Data.(*model.User)
+	store.Must(Srv.Store.User().VerifyEmail(user1.Id))
+
+	Client.LoginByEmail(team.Name, user1.Email, "pwd")
+
+	channel1 := &model.Channel{DisplayName: "TestGetPosts", Name: "a" + model.NewId() + "a", Type: model.CHANNEL_OPEN, TeamId: team.Id}
+	channel1 = Client.Must(Client.CreateChannel(channel1)).Data.(*model.Channel)
+
+	time.Sleep(10 * time.Millisecond)
+	post0 := &model.Post{ChannelId: channel1.Id, Message: "a" + model.NewId() + "a"}
+	post0 = Client.Must(Client.CreatePost(post0)).Data.(*model.Post)
+
+	time.Sleep(10 * time.Millisecond)
+	post1 := &model.Post{ChannelId: channel1.Id, Message: "a" + model.NewId() + "a"}
+	post1 = Client.Must(Client.CreatePost(post1)).Data.(*model.Post)
+
+	time.Sleep(10 * time.Millisecond)
+	post1a1 := &model.Post{ChannelId: channel1.Id, Message: "a" + model.NewId() + "a", RootId: post1.Id}
+	post1a1 = Client.Must(Client.CreatePost(post1a1)).Data.(*model.Post)
+
+	time.Sleep(10 * time.Millisecond)
+	post2 := &model.Post{ChannelId: channel1.Id, Message: "a" + model.NewId() + "a"}
+	post2 = Client.Must(Client.CreatePost(post2)).Data.(*model.Post)
+
+	time.Sleep(10 * time.Millisecond)
+	post3 := &model.Post{ChannelId: channel1.Id, Message: "a" + model.NewId() + "a"}
+	post3 = Client.Must(Client.CreatePost(post3)).Data.(*model.Post)
+
+	time.Sleep(10 * time.Millisecond)
+	post3a1 := &model.Post{ChannelId: channel1.Id, Message: "a" + model.NewId() + "a", RootId: post3.Id}
+	post3a1 = Client.Must(Client.CreatePost(post3a1)).Data.(*model.Post)
+
+	r1 := Client.Must(Client.GetPostsSince(channel1.Id, post1.CreateAt)).Data.(*model.PostList)
+
+	if r1.Order[0] != post3a1.Id {
+		t.Fatal("wrong order")
+	}
+
+	if r1.Order[1] != post3.Id {
+		t.Fatal("wrong order")
+	}
+
+	if len(r1.Posts) != 5 {
+		t.Fatal("wrong size")
+	}
+
+	now := model.GetMillis()
+	r2 := Client.Must(Client.GetPostsSince(channel1.Id, now)).Data.(*model.PostList)
+
+	if len(r2.Posts) != 0 {
+		t.Fatal("should have been empty")
+	}
+
+	post2.Message = "new message"
+	Client.Must(Client.UpdatePost(post2))
+
+	r3 := Client.Must(Client.GetPostsSince(channel1.Id, now)).Data.(*model.PostList)
+
+	if len(r3.Order) != 2 { // 2 because deleted post is returned as well
+		t.Fatal("missing post update")
 	}
 }
 
