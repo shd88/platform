@@ -4,18 +4,19 @@
 package web
 
 import (
-	l4g "code.google.com/p/log4go"
 	"fmt"
+	"html/template"
+	"net/http"
+	"strconv"
+	"strings"
+
+	l4g "code.google.com/p/log4go"
 	"github.com/gorilla/mux"
 	"github.com/mattermost/platform/api"
 	"github.com/mattermost/platform/model"
 	"github.com/mattermost/platform/utils"
 	"github.com/mssola/user_agent"
 	"gopkg.in/fsnotify.v1"
-	"html/template"
-	"net/http"
-	"strconv"
-	"strings"
 )
 
 var Templates *template.Template
@@ -30,6 +31,8 @@ func NewHtmlTemplatePage(templateName string, title string) *HtmlTemplatePage {
 
 	props := make(map[string]string)
 	props["AnalyticsUrl"] = utils.Cfg.ServiceSettings.AnalyticsUrl
+	props["ProfileHeight"] = fmt.Sprintf("%v", utils.Cfg.ImageSettings.ProfileHeight)
+	props["ProfileWidth"] = fmt.Sprintf("%v", utils.Cfg.ImageSettings.ProfileWidth)
 	return &HtmlTemplatePage{TemplateName: templateName, Title: title, SiteName: utils.Cfg.ServiceSettings.SiteName, Props: props}
 }
 
@@ -142,6 +145,7 @@ func root(c *api.Context, w http.ResponseWriter, r *http.Request) {
 
 	if len(c.Session.UserId) == 0 {
 		page := NewHtmlTemplatePage("signup_team", "Signup")
+		page.Props["AuthServices"] = model.ArrayToJson(utils.GetAllowedAuthServices())
 		page.Render(c, w)
 	} else {
 		page := NewHtmlTemplatePage("home", "Home")
@@ -157,6 +161,7 @@ func signup(c *api.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	page := NewHtmlTemplatePage("signup_team", "Signup")
+	page.Props["AuthServices"] = model.ArrayToJson(utils.GetAllowedAuthServices())
 	page.Render(c, w)
 }
 
@@ -212,7 +217,7 @@ func signupTeamComplete(c *api.Context, w http.ResponseWriter, r *http.Request) 
 	props := model.MapFromJson(strings.NewReader(data))
 
 	t, err := strconv.ParseInt(props["time"], 10, 64)
-	if err != nil || model.GetMillis()-t > 1000*60*60 { // one hour
+	if err != nil || model.GetMillis()-t > 1000*60*60*24*30 { // 30 days
 		c.Err = model.NewAppError("signupTeamComplete", "The signup link has expired", "")
 		return
 	}
@@ -516,9 +521,6 @@ func signupCompleteOAuth(c *api.Context, w http.ResponseWriter, r *http.Request)
 		if service == model.USER_AUTH_SERVICE_GITLAB {
 			glu := model.GitLabUserFromJson(body)
 			user = model.UserFromGitLabUser(glu)
-		} else if service == model.USER_AUTH_SERVICE_GOOGLE {
-			gu := model.GoogleUserFromJson(body)
-			user = model.UserFromGoogleUser(gu)
 		}
 
 		if user == nil {
@@ -526,23 +528,52 @@ func signupCompleteOAuth(c *api.Context, w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		if result := <-api.Srv.Store.User().GetByAuth(team.Id, user.AuthData, service); result.Err == nil {
+		suchan := api.Srv.Store.User().GetByAuth(team.Id, user.AuthData, service)
+		euchan := api.Srv.Store.User().GetByEmail(team.Id, user.Email)
+
+		if team.Email == "" {
+			team.Email = user.Email
+			if result := <-api.Srv.Store.Team().Update(team); result.Err != nil {
+				c.Err = result.Err
+				return
+			}
+		} else {
+			found := true
+			count := 0
+			for found {
+				if found = api.IsUsernameTaken(user.Username, team.Id); c.Err != nil {
+					return
+				} else if found {
+					user.Username = user.Username + strconv.Itoa(count)
+					count += 1
+				}
+			}
+		}
+
+		if result := <-suchan; result.Err == nil {
 			c.Err = model.NewAppError("signupCompleteOAuth", "This "+service+" account has already been used to sign up for team "+team.DisplayName, "email="+user.Email)
 			return
 		}
 
-		if result := <-api.Srv.Store.User().GetByEmail(team.Id, user.Email); result.Err == nil {
+		if result := <-euchan; result.Err == nil {
 			c.Err = model.NewAppError("signupCompleteOAuth", "Team "+team.DisplayName+" already has a user with the email address attached to your "+service+" account", "email="+user.Email)
 			return
 		}
 
 		user.TeamId = team.Id
 
-		page := NewHtmlTemplatePage("signup_user_oauth", "Complete User Sign Up")
-		page.Props["User"] = user.ToJson()
-		page.Props["TeamName"] = team.Name
-		page.Props["TeamDisplayName"] = team.DisplayName
-		page.Render(c, w)
+		ruser := api.CreateUser(c, team, user)
+		if c.Err != nil {
+			return
+		}
+
+		api.Login(c, w, r, ruser, "")
+
+		if c.Err != nil {
+			return
+		}
+
+		root(c, w, r)
 	}
 }
 
@@ -586,9 +617,6 @@ func loginCompleteOAuth(c *api.Context, w http.ResponseWriter, r *http.Request) 
 		if service == model.USER_AUTH_SERVICE_GITLAB {
 			glu := model.GitLabUserFromJson(body)
 			authData = glu.GetAuthData()
-		} else if service == model.USER_AUTH_SERVICE_GOOGLE {
-			gu := model.GoogleUserFromJson(body)
-			authData = gu.GetAuthData()
 		}
 
 		if len(authData) == 0 {

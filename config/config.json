@@ -22,7 +22,8 @@
         "AnalyticsUrl": "",
         "UseLocalStorage": true,
         "StorageDirectory": "./data/",
-        "AllowedLoginAttempts": 10
+        "AllowedLoginAttempts": 10,
+        "DisableEmailSignUp": false
     },
     "SSOSettings": {
         "gitlab": {
@@ -33,15 +34,6 @@
             "AuthEndpoint": "",
             "TokenEndpoint": "",
             "UserApiEndpoint": ""
-        },
-        "google": {
-            "Allow": false,
-            "Secret": "",
-            "Id": "",
-            "Scope": "email profile",
-            "AuthEndpoint": "https://accounts.google.com/o/oauth2/auth",
-            "TokenEndpoint": "https://www.googleapis.com/oauth2/v3/token",
-            "UserApiEndpoint": "https://www.googleapis.com/plus/v1/people/me"
         }
     },
     "SqlSettings": {
@@ -73,8 +65,8 @@
         "SMTPUsername": "",
         "SMTPPassword": "",
         "SMTPServer": "",
-               "UseTLS": false,
-               "UseStartTLS": false,
+        "UseTLS": false,
+        "UseStartTLS": false,
         "FeedbackEmail": "",
         "FeedbackName": "",
         "ApplePushServer": "",
@@ -104,6 +96,8 @@
         "HelpLink": "/static/help/configure_links.html",
         "ReportProblemLink": "/static/help/configure_links.html",
         "TourLink": "/static/help/configure_links.html",
-        "DefaultThemeColor": "#2389D7"
+        "DefaultThemeColor": "#2389D7",
+        "DisableTeamCreation": false,
+        "RestrictCreationToDomains": ""
     }
 }

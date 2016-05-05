@@ -22,13 +22,15 @@
         "AnalyticsUrl": "",
         "UseLocalStorage": true,
         "StorageDirectory": "/mattermost/data/",
-        "AllowedLoginAttempts": 10
+        "AllowedLoginAttempts": 10,
+        "DisableEmailSignUp": false
     },
     "SSOSettings": {
         "gitlab": {
             "Allow": false,
             "Secret" : "",
             "Id": "",
+            "Scope": "",
             "AuthEndpoint": "",
             "TokenEndpoint": "",
             "UserApiEndpoint": ""
@@ -94,6 +96,8 @@
         "HelpLink": "/static/help/configure_links.html",
         "ReportProblemLink": "/static/help/configure_links.html",
         "TourLink": "/static/help/configure_links.html",
-        "DefaultThemeColor": "#2389D7"
+        "DefaultThemeColor": "#2389D7",
+        "DisableTeamCreation": false,
+        "RestrictCreationToDomains": ""
     }
 }

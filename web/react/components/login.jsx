@@ -1,37 +1,40 @@
 // Copyright (c) 2015 Spinpunch, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var utils = require('../utils/utils.jsx');
-var client = require('../utils/client.jsx');
-var UserStore = require('../stores/user_store.jsx');
-var BrowserStore = require('../stores/browser_store.jsx');
-var Constants = require('../utils/constants.jsx');
+const Utils = require('../utils/utils.jsx');
+const Client = require('../utils/client.jsx');
+const UserStore = require('../stores/user_store.jsx');
+const BrowserStore = require('../stores/browser_store.jsx');
+const Constants = require('../utils/constants.jsx');
+import {config, strings} from '../utils/config.js';
 
 export default class Login extends React.Component {
     constructor(props) {
         super(props);
+
         this.handleSubmit = this.handleSubmit.bind(this);
+
         this.state = {};
     }
     handleSubmit(e) {
         e.preventDefault();
-        var state = {};
+        let state = {};
 
-        var name = this.props.teamName;
+        const name = this.props.teamName;
         if (!name) {
             state.serverError = 'Bad team name';
             this.setState(state);
             return;
         }
 
-        var email = this.refs.email.getDOMNode().value.trim();
+        const email = React.findDOMNode(this.refs.email).value.trim();
         if (!email) {
             state.serverError = 'An email is required';
             this.setState(state);
             return;
         }
 
-        var password = this.refs.password.getDOMNode().value.trim();
+        const password = React.findDOMNode(this.refs.password).value.trim();
         if (!password) {
             state.serverError = 'A password is required';
             this.setState(state);
@@ -47,12 +50,12 @@ export default class Login extends React.Component {
         state.serverError = '';
         this.setState(state);
 
-        client.loginByEmail(name, email, password,
+        Client.loginByEmail(name, email, password,
             function loggedIn(data) {
                 UserStore.setCurrentUser(data);
                 UserStore.setLastEmail(email);
 
-                var redirect = utils.getUrlParameter('redirect');
+                const redirect = Utils.getUrlParameter('redirect');
                 if (redirect) {
                     window.location.href = decodeURIComponent(redirect);
                 } else {
@@ -71,60 +74,52 @@ export default class Login extends React.Component {
         );
     }
     render() {
-        var serverError;
+        let serverError;
         if (this.state.serverError) {
             serverError = <label className='control-label'>{this.state.serverError}</label>;
         }
-        var priorEmail = UserStore.getLastEmail();
+        let priorEmail = UserStore.getLastEmail();
 
-        var emailParam = utils.getUrlParameter('email');
+        const emailParam = Utils.getUrlParameter('email');
         if (emailParam) {
             priorEmail = decodeURIComponent(emailParam);
         }
 
-        var teamDisplayName = this.props.teamDisplayName;
-        var teamName = this.props.teamName;
+        const teamDisplayName = this.props.teamDisplayName;
+        const teamName = this.props.teamName;
 
-        var focusEmail = false;
-        var focusPassword = false;
+        let focusEmail = false;
+        let focusPassword = false;
         if (priorEmail !== '') {
             focusPassword = true;
         } else {
             focusEmail = true;
         }
 
-        var authServices = JSON.parse(this.props.authServices);
+        const authServices = JSON.parse(this.props.authServices);
 
-        var loginMessage = [];
-        if (authServices.indexOf(Constants.GITLAB_SERVICE) >= 0) {
+        let loginMessage = [];
+        if (authServices.indexOf(Constants.GITLAB_SERVICE) !== -1) {
             loginMessage.push(
-                <div className='form-group form-group--small'>
-                    <span><a href={'/' + teamName + '/login/gitlab'}>{'Log in with GitLab'}</a></span>
-                </div>
-            );
-        }
-        if (authServices.indexOf(Constants.GOOGLE_SERVICE) >= 0) {
-            loginMessage.push(
-                <div className='form-group form-group--small'>
-                    <span><a href={'/' + teamName + '/login/google'}>{'Log in with Google'}</a></span>
-                </div>
-            );
+                    <a
+                        className='btn btn-custom-login gitlab'
+                        href={'/' + teamName + '/login/gitlab'}
+                    >
+                        <span className='icon' />
+                        <span>with GitLab</span>
+                    </a>
+           );
         }
 
-        var errorClass = '';
+        let errorClass = '';
         if (serverError) {
             errorClass = ' has-error';
         }
 
-        return (
-            <div className='signup-team__container'>
-                <h5 className='margin--less'>Sign in to:</h5>
-                <h2 className='signup-team__name'>{teamDisplayName}</h2>
-                <h2 className='signup-team__subdomain'>on {config.SiteName}</h2>
-                <form onSubmit={this.handleSubmit}>
-                    <div className={'form-group' + errorClass}>
-                        {serverError}
-                    </div>
+        let emailSignup;
+        if (authServices.indexOf(Constants.EMAIL_SERVICE) !== -1) {
+            emailSignup = (
+                <div>
                     <div className={'form-group' + errorClass}>
                         <input
                             autoFocus={focusEmail}
@@ -154,13 +149,45 @@ export default class Login extends React.Component {
                             Sign in
                         </button>
                     </div>
+                </div>
+            );
+        }
+
+        if (loginMessage.length > 0 && emailSignup) {
+            loginMessage = (
+                <div>
                     {loginMessage}
+                    <div className='or__container'>
+                        <span>or</span>
+                    </div>
+                </div>
+            );
+        }
+
+        let forgotPassword;
+        if (emailSignup) {
+            forgotPassword = (
+                <div className='form-group'>
+                    <a href={'/' + teamName + '/reset_password'}>I forgot my password</a>
+                </div>
+            );
+        }
+
+        return (
+            <div className='signup-team__container'>
+                <h5 className='margin--less'>Sign in to:</h5>
+                <h2 className='signup-team__name'>{teamDisplayName}</h2>
+                <h2 className='signup-team__subdomain'>on {config.SiteName}</h2>
+                <form onSubmit={this.handleSubmit}>
+                    <div className={'form-group' + errorClass}>
+                        {serverError}
+                    </div>
+                    {loginMessage}
+                    {emailSignup}
                     <div className='form-group margin--extra form-group--small'>
                         <span><a href='/find_team'>{'Find other ' + strings.TeamPlural}</a></span>
                     </div>
-                    <div className='form-group'>
-                        <a href={'/' + teamName + '/reset_password'}>I forgot my password</a>
-                    </div>
+                    {forgotPassword}
                     <div className='margin--extra'>
                         <span>{'Want to create your own ' + strings.Team + '? '}
                             <a

@@ -6,6 +6,8 @@
 About Mattermost
 ================
 
+[![Join the chat at https://gitter.im/shd88/platform](https://badges.gitter.im/shd88/platform.svg)](https://gitter.im/shd88/platform?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Mattermost is an open-source team communication service. It brings team messaging and file sharing into one place, accessible across PCs and phones, with archiving and search.
 
 Learn More

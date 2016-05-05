@@ -31,6 +31,7 @@ type ServiceSettings struct {
 	UseLocalStorage      bool
 	StorageDirectory     string
 	AllowedLoginAttempts int
+	DisableEmailSignUp   bool
 }
 
 type SSOSetting struct {
@@ -109,16 +110,18 @@ type PrivacySettings struct {
 }
 
 type TeamSettings struct {
-	MaxUsersPerTeam   int
-	AllowPublicLink   bool
-	AllowValetDefault bool
-	TermsLink         string
-	PrivacyLink       string
-	AboutLink         string
-	HelpLink          string
-	ReportProblemLink string
-	TourLink          string
-	DefaultThemeColor string
+	MaxUsersPerTeam           int
+	AllowPublicLink           bool
+	AllowValetDefault         bool
+	TermsLink                 string
+	PrivacyLink               string
+	AboutLink                 string
+	HelpLink                  string
+	ReportProblemLink         string
+	TourLink                  string
+	DefaultThemeColor         string
+	DisableTeamCreation       bool
+	RestrictCreationToDomains string
 }
 
 type Config struct {
@@ -234,8 +237,8 @@ func LoadConfig(fileName string) {
 
 	// Check for a valid email for feedback, if not then do feedback@domain
 	if _, err := mail.ParseAddress(config.EmailSettings.FeedbackEmail); err != nil {
-		config.EmailSettings.FeedbackEmail = "feedback@localhost"
 		l4g.Error("Misconfigured feedback email setting: %s", config.EmailSettings.FeedbackEmail)
+		config.EmailSettings.FeedbackEmail = "feedback@localhost"
 	}
 
 	configureLog(config.LogSettings)
@@ -275,5 +278,23 @@ func GetAllowedAuthServices() []string {
 		}
 	}
 
+	if !Cfg.ServiceSettings.DisableEmailSignUp {
+		authServices = append(authServices, "email")
+	}
+
 	return authServices
+}
+
+func IsServiceAllowed(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+
+	if service, ok := Cfg.SSOSettings[s]; ok {
+		if service.Allow {
+			return true
+		}
+	}
+
+	return false
 }

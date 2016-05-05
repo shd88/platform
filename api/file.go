@@ -30,13 +30,17 @@ import (
 	"time"
 )
 
+var fileInfoCache *utils.Cache = utils.NewLru(1000)
+
 func InitFile(r *mux.Router) {
 	l4g.Debug("Initializing file api routes")
 
 	sr := r.PathPrefix("/files").Subrouter()
 	sr.Handle("/upload", ApiUserRequired(uploadFile)).Methods("POST")
-	sr.Handle("/get/{channel_id:[A-Za-z0-9]+}/{user_id:[A-Za-z0-9]+}/{filename:([A-Za-z0-9]+/)?.+(\\.[A-Za-z0-9]{3,})?}", ApiAppHandler(getFile)).Methods("GET", "HEAD")
+	sr.Handle("/get/{channel_id:[A-Za-z0-9]+}/{user_id:[A-Za-z0-9]+}/{filename:([A-Za-z0-9]+/)?.+(\\.[A-Za-z0-9]{3,})?}", ApiAppHandler(getFile)).Methods("GET")
+	sr.Handle("/get_info/{channel_id:[A-Za-z0-9]+}/{user_id:[A-Za-z0-9]+}/{filename:([A-Za-z0-9]+/)?.+(\\.[A-Za-z0-9]{3,})?}", ApiAppHandler(getFileInfo)).Methods("GET")
 	sr.Handle("/get_public_link", ApiUserRequired(getPublicLink)).Methods("POST")
+	sr.Handle("/get_export", ApiUserRequired(getExport)).Methods("GET")
 }
 
 func uploadFile(c *Context, w http.ResponseWriter, r *http.Request) {
@@ -213,9 +217,72 @@ type ImageGetResult struct {
 	ImageData []byte
 }
 
+func getFileInfo(c *Context, w http.ResponseWriter, r *http.Request) {
+	if !utils.IsS3Configured() && !utils.Cfg.ServiceSettings.UseLocalStorage {
+		c.Err = model.NewAppError("getFileInfo", "Unable to get file info. Amazon S3 not configured and local server storage turned off. ", "")
+		c.Err.StatusCode = http.StatusNotImplemented
+		return
+	}
+
+	params := mux.Vars(r)
+
+	channelId := params["channel_id"]
+	if len(channelId) != 26 {
+		c.SetInvalidParam("getFileInfo", "channel_id")
+		return
+	}
+
+	userId := params["user_id"]
+	if len(userId) != 26 {
+		c.SetInvalidParam("getFileInfo", "user_id")
+		return
+	}
+
+	filename := params["filename"]
+	if len(filename) == 0 {
+		c.SetInvalidParam("getFileInfo", "filename")
+		return
+	}
+
+	cchan := Srv.Store.Channel().CheckPermissionsTo(c.Session.TeamId, channelId, c.Session.UserId)
+
+	path := "teams/" + c.Session.TeamId + "/channels/" + channelId + "/users/" + userId + "/" + filename
+	size := ""
+
+	if s, ok := fileInfoCache.Get(path); ok {
+		size = s.(string)
+	} else {
+
+		fileData := make(chan []byte)
+		asyncGetFile(path, fileData)
+
+		f := <-fileData
+
+		if f == nil {
+			c.Err = model.NewAppError("getFileInfo", "Could not find file.", "path="+path)
+			c.Err.StatusCode = http.StatusNotFound
+			return
+		}
+
+		size = strconv.Itoa(len(f))
+		fileInfoCache.Add(path, size)
+	}
+
+	if !c.HasPermissionsToChannel(cchan, "getFileInfo") {
+		return
+	}
+
+	w.Header().Set("Cache-Control", "max-age=2592000, public")
+
+	result := make(map[string]string)
+	result["filename"] = filename
+	result["size"] = size
+	w.Write([]byte(model.MapToJson(result)))
+}
+
 func getFile(c *Context, w http.ResponseWriter, r *http.Request) {
 	if !utils.IsS3Configured() && !utils.Cfg.ServiceSettings.UseLocalStorage {
-		c.Err = model.NewAppError("getFile", "Unable to upload file. Amazon S3 not configured and local server storage turned off. ", "")
+		c.Err = model.NewAppError("getFile", "Unable to get file. Amazon S3 not configured and local server storage turned off. ", "")
 		c.Err.StatusCode = http.StatusNotImplemented
 		return
 	}
@@ -282,10 +349,7 @@ func getFile(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Cache-Control", "max-age=2592000, public")
 	w.Header().Set("Content-Length", strconv.Itoa(len(f)))
-
-	if r.Method != "HEAD" {
-		w.Write(f)
-	}
+	w.Write(f)
 }
 
 func asyncGetFile(path string, fileData chan []byte) {
@@ -349,6 +413,23 @@ func getPublicLink(c *Context, w http.ResponseWriter, r *http.Request) {
 	rData["public_link"] = url
 
 	w.Write([]byte(model.MapToJson(rData)))
+}
+
+func getExport(c *Context, w http.ResponseWriter, r *http.Request) {
+	if !c.HasPermissionsToTeam(c.Session.TeamId, "export") || !c.IsTeamAdmin(c.Session.UserId) {
+		c.Err = model.NewAppError("getExport", "Only a team admin can retrieve exported data.", "userId="+c.Session.UserId)
+		c.Err.StatusCode = http.StatusForbidden
+		return
+	}
+	data, err := readFile(EXPORT_PATH + EXPORT_FILENAME)
+	if err != nil {
+		c.Err = model.NewAppError("getExport", "Unable to retrieve exported file. Please re-export", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Disposition", "attachment; filename="+EXPORT_FILENAME)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(data)
 }
 
 func writeFile(f []byte, path string) *model.AppError {
@@ -424,4 +505,28 @@ func readFile(path string) ([]byte, *model.AppError) {
 	} else {
 		return nil, model.NewAppError("readFile", "File storage not configured properly. Please configure for either S3 or local server file storage.", "")
 	}
+}
+
+func openFileWriteStream(path string) (io.Writer, *model.AppError) {
+	if utils.IsS3Configured() && !utils.Cfg.ServiceSettings.UseLocalStorage {
+		return nil, model.NewAppError("openFileWriteStream", "S3 is not supported.", "")
+	} else if utils.Cfg.ServiceSettings.UseLocalStorage && len(utils.Cfg.ServiceSettings.StorageDirectory) > 0 {
+		if err := os.MkdirAll(filepath.Dir(utils.Cfg.ServiceSettings.StorageDirectory+path), 0774); err != nil {
+			return nil, model.NewAppError("openFileWriteStream", "Encountered an error creating the directory for the new file", err.Error())
+		}
+
+		if fileHandle, err := os.Create(utils.Cfg.ServiceSettings.StorageDirectory + path); err != nil {
+			return nil, model.NewAppError("openFileWriteStream", "Encountered an error writing to local server storage", err.Error())
+		} else {
+			fileHandle.Chmod(0644)
+			return fileHandle, nil
+		}
+
+	}
+
+	return nil, model.NewAppError("openFileWriteStream", "File storage not configured properly. Please configure for either S3 or local server file storage.", "")
+}
+
+func closeFileWriteStream(file io.Writer) {
+	file.(*os.File).Close()
 }

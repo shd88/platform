@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/mail"
 	"net/smtp"
+	"time"
 )
 
 func CheckMailSettings() *model.AppError {
@@ -79,6 +80,9 @@ func newSMTPClient(conn net.Conn) (*smtp.Client, *model.AppError) {
 			ServerName:         host,
 		}
 		c.StartTLS(tlsconfig)
+		if err = c.Auth(auth); err != nil {
+			return nil, model.NewAppError("SendMail", "Failed to authenticate on SMTP server", err.Error())
+		}
 	}
 	return c, nil
 }
@@ -98,6 +102,7 @@ func SendMail(to, subject, body string) *model.AppError {
 	headers["Subject"] = html.UnescapeString(subject)
 	headers["MIME-version"] = "1.0"
 	headers["Content-Type"] = "text/html"
+	headers["Date"] = time.Now().Format(time.RFC1123Z)
 
 	message := ""
 	for k, v := range headers {
